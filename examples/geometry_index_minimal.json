@@ -1,0 +1,48 @@
+{
+  "doc": "Example.pdf",
+  "pages": [
+    {
+      "page": 1,
+      "words": [
+        {
+          "id": "w_000001",
+          "text": "Jane",
+          "quad": [10, 20, 10, 10, 40, 20, 40, 10],
+          "line_id": "ln_001_0001",
+          "sent_id": "s_001_0001",
+          "order": 1
+        },
+        {
+          "id": "w_000002",
+          "text": "Smith",
+          "quad": [50, 20, 50, 10, 90, 20, 90, 10],
+          "line_id": "ln_001_0001",
+          "sent_id": "s_001_0001",
+          "order": 2
+        }
+      ],
+      "lines": [
+        {
+          "id": "ln_001_0001",
+          "line_no": 1,
+          "text": "Jane Smith",
+          "bbox": [10, 10, 90, 20],
+          "word_ids": ["w_000001", "w_000002"],
+          "chunk_id": "synthetic_0001"
+        }
+      ],
+      "sentences": [
+        {
+          "id": "s_001_0001",
+          "sent_no": 1,
+          "text": "Jane Smith",
+          "bbox": [10, 10, 90, 20],
+          "word_ids": ["w_000001", "w_000002"],
+          "chunk_id": "synthetic_0001"
+        }
+      ]
+    }
+  ],
+  "meta": { "source": "example", "version": "geometry-index/0.1" }
+}
+
