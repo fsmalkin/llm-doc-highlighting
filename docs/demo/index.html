@@ -1,0 +1,484 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Reading View Demo</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b0d12;
+        --panel: #111622;
+        --text: #e6e9ef;
+        --muted: #aab3c0;
+        --border: #2a3350;
+        --accent: #7aa2f7;
+        --good: #7ee787;
+        --warn: #f2cc60;
+        --bad: #ff7b72;
+        --hl: rgba(122, 162, 247, 0.28);
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji",
+          "Segoe UI Emoji";
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .wrap {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 24px 18px 40px;
+      }
+
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 22px;
+      }
+      p {
+        margin: 8px 0;
+        color: var(--muted);
+        line-height: 1.45;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 14px;
+        margin-top: 14px;
+      }
+      @media (min-width: 980px) {
+        .grid {
+          grid-template-columns: 1.2fr 0.8fr;
+        }
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12.5px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 160px 1fr;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0;
+      }
+      label {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 9px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        outline: none;
+      }
+      input:focus {
+        border-color: rgba(122, 162, 247, 0.7);
+        box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
+      }
+
+      .btns {
+        display: flex;
+        gap: 10px;
+        margin-top: 12px;
+      }
+      button {
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        padding: 9px 12px;
+        border-radius: 10px;
+        cursor: pointer;
+      }
+      button:hover {
+        border-color: rgba(122, 162, 247, 0.7);
+      }
+
+      .kpi {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .kpi > div {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .kpi .v {
+        font-size: 18px;
+        font-weight: 650;
+      }
+      .kpi .k {
+        font-size: 12px;
+        color: var(--muted);
+        margin-top: 2px;
+      }
+
+      .pill {
+        display: inline-block;
+        font-size: 12px;
+        padding: 2px 8px;
+        border: 1px solid var(--border);
+        border-radius: 999px;
+        color: var(--muted);
+        margin-left: 8px;
+      }
+
+      .ok {
+        color: var(--good);
+      }
+      .warn {
+        color: var(--warn);
+      }
+      .bad {
+        color: var(--bad);
+      }
+
+      .hl {
+        background: var(--hl);
+        border-radius: 6px;
+        padding: 0 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h1>Token-Indexed Reading View + Span Citations <span class="pill">static demo</span></h1>
+        <p>
+          This page demonstrates the core mechanism: build a reading view with stable global token indices, have an LLM cite
+          <span class="mono">{start_token,end_token,start_text,end_text}</span>, then deterministically map that span to
+          <span class="mono">word_ids</span>.
+        </p>
+        <p>
+          It also shows why a two-pass approach is compelling: the indexed view is unambiguous, but adds a lot of text
+          overhead. A coarse first pass can localize, then a fine pass can cite spans inside a small window.
+        </p>
+        <p><a href="../index.html">Back to docs index</a></p>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h2 style="margin: 0 0 8px; font-size: 16px">Reading view</h2>
+          <p style="margin-top: 0">Toggle between plain and token-indexed. The span mapping always uses token indices.</p>
+          <div class="btns">
+            <button id="btnPlain">Plain view</button>
+            <button id="btnIndexed">Indexed view</button>
+          </div>
+          <div class="kpi">
+            <div>
+              <div class="v" id="kChars">0</div>
+              <div class="k">Characters shown</div>
+            </div>
+            <div>
+              <div class="v" id="kTokens">0</div>
+              <div class="k">Tokens (words)</div>
+            </div>
+            <div>
+              <div class="v" id="kLines">0</div>
+              <div class="k">Lines</div>
+            </div>
+          </div>
+          <div id="view" class="mono" style="margin-top: 12px"></div>
+        </div>
+
+        <div class="card">
+          <h2 style="margin: 0 0 8px; font-size: 16px">Span citation</h2>
+          <p style="margin-top: 0">
+            Simulate an LLM returning a slightly-wrong span and use guard tokens to snap it.
+          </p>
+
+          <div class="row">
+            <label for="startToken">start_token</label>
+            <input id="startToken" inputmode="numeric" value="1" />
+          </div>
+          <div class="row">
+            <label for="endToken">end_token</label>
+            <input id="endToken" inputmode="numeric" value="1" />
+          </div>
+          <div class="row">
+            <label for="startText">start_text</label>
+            <input id="startText" value="Jane" />
+          </div>
+          <div class="row">
+            <label for="endText">end_text</label>
+            <input id="endText" value="Smith" />
+          </div>
+          <div class="row">
+            <label for="maxWindow">guard window</label>
+            <input id="maxWindow" inputmode="numeric" value="8" />
+          </div>
+
+          <div class="btns">
+            <button id="btnApply">Apply guard snapping</button>
+            <button id="btnReset">Reset</button>
+          </div>
+
+          <div style="margin-top: 12px">
+            <div class="mono" id="out"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const geom = {
+        doc: "Example.pdf",
+        pages: [
+          {
+            page: 1,
+            words: [
+              { id: "w_000001", text: "Patient", quad: [] },
+              { id: "w_000002", text: "Name:", quad: [] },
+              { id: "w_000003", text: "Jane", quad: [] },
+              { id: "w_000004", text: "Smith", quad: [] },
+            ],
+            lines: [
+              {
+                id: "ln_001_0001",
+                line_no: 1,
+                text: "Patient Name: Jane Smith",
+                word_ids: ["w_000001", "w_000002", "w_000003", "w_000004"],
+              },
+            ],
+          },
+        ],
+      };
+
+      const wordsById = new Map();
+      for (const pg of geom.pages) {
+        for (const w of pg.words) wordsById.set(w.id, w);
+      }
+
+      const readingLines = [];
+      let globalToken = 0;
+      let globalLineNo = 0;
+      for (const pg of geom.pages) {
+        for (const ln of pg.lines) {
+          const ids = ln.word_ids.map(String);
+          const indexed = ids
+            .map((wid, i) => `[${globalToken + i}:${wid}]${String(wordsById.get(wid)?.text ?? "")}`)
+            .join(" ");
+          readingLines.push({
+            global_line_no: globalLineNo++,
+            text: String(ln.text),
+            indexed_text: indexed,
+            word_ids: ids,
+          });
+          globalToken += ids.length;
+        }
+      }
+
+      const flatWordIds = readingLines.flatMap((ln) => ln.word_ids);
+      const tokenToLine = [];
+      readingLines.forEach((ln, idx) => {
+        for (let i = 0; i < ln.word_ids.length; i++) tokenToLine.push(idx);
+      });
+
+      function normalizeGuardToken(s) {
+        return String(s ?? "")
+          .normalize("NFKC")
+          .replace(/[^A-Za-z0-9]/g, "")
+          .toLowerCase();
+      }
+
+      function tokenText(idx) {
+        const wid = flatWordIds[idx];
+        return String(wordsById.get(wid)?.text ?? "");
+      }
+
+      function adjustSpanUsingGuards({ startToken, endToken, startText, endText, maxWindow }) {
+        let start = Number(startToken);
+        let end = Number(endToken);
+        let adjusted = false;
+
+        function findNearestMatch(target, from) {
+          const normTarget = normalizeGuardToken(target);
+          if (!normTarget) return null;
+          if (normalizeGuardToken(tokenText(from)) === normTarget) return from;
+          let bestIdx = null;
+          let bestDist = Number.POSITIVE_INFINITY;
+          const lo = Math.max(0, from - maxWindow);
+          const hi = Math.min(flatWordIds.length - 1, from + maxWindow);
+          for (let idx = lo; idx <= hi; idx++) {
+            if (normalizeGuardToken(tokenText(idx)) === normTarget) {
+              const dist = Math.abs(idx - from);
+              if (dist < bestDist) {
+                bestDist = dist;
+                bestIdx = idx;
+                if (dist === 0) break;
+              }
+            }
+          }
+          return bestIdx;
+        }
+
+        if (String(startText || "").trim()) {
+          const snap = findNearestMatch(startText, start);
+          if (snap != null && snap !== start) {
+            start = snap;
+            adjusted = true;
+          }
+        }
+        if (String(endText || "").trim()) {
+          const snap = findNearestMatch(endText, end);
+          if (snap != null && snap !== end) {
+            end = snap;
+            adjusted = true;
+          }
+        }
+        if (start > end) {
+          const tmp = start;
+          start = end;
+          end = tmp;
+          adjusted = true;
+        }
+
+        start = Math.max(0, Math.min(start, flatWordIds.length - 1));
+        end = Math.max(start, Math.min(end, flatWordIds.length - 1));
+        return { start_token: start, end_token: end, adjusted };
+      }
+
+      function renderView({ indexed, highlightRange }) {
+        const lines = readingLines.map((ln) => {
+          const text = indexed ? ln.indexed_text : ln.text;
+          if (!highlightRange || !indexed) return `${ln.global_line_no}\t${text}`;
+
+          // Highlight by replacing token prefix patterns in indexed view.
+          // This is a demo-only approach; real mapping happens via token indices -> word_ids.
+          const [a, b] = highlightRange;
+          let idx = 0;
+          const parts = [];
+          for (const wid of ln.word_ids) {
+            const tokenIdx = flatWordIds.indexOf(wid, idx);
+            idx = tokenIdx + 1;
+            const token = `[${tokenIdx}:${wid}]${String(wordsById.get(wid)?.text ?? "")}`;
+            const isHit = tokenIdx >= a && tokenIdx <= b;
+            parts.push(isHit ? `<span class="hl">${escapeHtml(token)}</span>` : escapeHtml(token));
+          }
+          return `${ln.global_line_no}\t${parts.join(" ")}`;
+        });
+        return lines.join("\n");
+      }
+
+      function escapeHtml(s) {
+        return String(s)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      const viewEl = document.getElementById("view");
+      const outEl = document.getElementById("out");
+      const kChars = document.getElementById("kChars");
+      const kTokens = document.getElementById("kTokens");
+      const kLines = document.getElementById("kLines");
+
+      let showIndexed = true;
+      let lastRange = null;
+
+      function updateKpis(text) {
+        kChars.textContent = String(text.length);
+        kTokens.textContent = String(flatWordIds.length);
+        kLines.textContent = String(readingLines.length);
+      }
+
+      function render() {
+        const html = renderView({ indexed: showIndexed, highlightRange: lastRange });
+        if (showIndexed) {
+          viewEl.innerHTML = html;
+        } else {
+          viewEl.textContent = html;
+        }
+        updateKpis(html.replace(/<[^>]+>/g, ""));
+      }
+
+      document.getElementById("btnPlain").addEventListener("click", () => {
+        showIndexed = false;
+        render();
+      });
+      document.getElementById("btnIndexed").addEventListener("click", () => {
+        showIndexed = true;
+        render();
+      });
+
+      document.getElementById("btnApply").addEventListener("click", () => {
+        const startToken = Number(document.getElementById("startToken").value);
+        const endToken = Number(document.getElementById("endToken").value);
+        const startText = document.getElementById("startText").value;
+        const endText = document.getElementById("endText").value;
+        const maxWindow = Number(document.getElementById("maxWindow").value);
+
+        const res = adjustSpanUsingGuards({ startToken, endToken, startText, endText, maxWindow });
+        const ids = flatWordIds.slice(res.start_token, res.end_token + 1);
+        const lineA = tokenToLine[res.start_token];
+        const lineB = tokenToLine[res.end_token];
+        const lineNoA = readingLines[lineA]?.global_line_no;
+        const lineNoB = readingLines[lineB]?.global_line_no;
+        lastRange = [res.start_token, res.end_token];
+        showIndexed = true;
+
+        outEl.innerHTML =
+          escapeHtml(
+            JSON.stringify(
+              {
+                start_token: res.start_token,
+                end_token: res.end_token,
+                adjusted: res.adjusted,
+                line_range: { start_line_no: lineNoA ?? null, end_line_no: lineNoB ?? null },
+                word_ids: ids,
+                span_text: ids.map((wid) => String(wordsById.get(wid)?.text ?? "")).join(" "),
+              },
+              null,
+              2
+            )
+          ) +
+          "\n" +
+          `<span class="${res.adjusted ? "warn" : "ok"}">${res.adjusted ? "Adjusted using guards." : "No adjustment needed."}</span>`;
+        render();
+      });
+
+      document.getElementById("btnReset").addEventListener("click", () => {
+        document.getElementById("startToken").value = "1";
+        document.getElementById("endToken").value = "1";
+        document.getElementById("startText").value = "Jane";
+        document.getElementById("endText").value = "Smith";
+        document.getElementById("maxWindow").value = "8";
+        outEl.textContent = "";
+        lastRange = null;
+        showIndexed = true;
+        render();
+      });
+
+      render();
+    </script>
+  </body>
+</html>
+
