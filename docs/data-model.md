@@ -49,7 +49,7 @@ Offsets are indices into `ade_chunks[].text`.
 
 ## Canonical highlight output (single highlight)
 
-This is the minimal shape used to render “context” and “answer” layers.
+This is the minimal shape used to render "context" and "answer" layers.
 
 ```json
 {

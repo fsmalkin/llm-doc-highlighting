@@ -1,6 +1,6 @@
 # Geometry Index
 
-The “geometry index” is a derived Phase 1 artifact that rearranges word/line geometry into a page-centric structure with stable IDs and a deterministic reading order.
+The "geometry index" is a derived Phase 1 artifact that rearranges word/line geometry into a page-centric structure with stable IDs and a deterministic reading order.
 
 Why it exists:
 - resolvers and renderers usually operate page-by-page
@@ -11,4 +11,3 @@ Key properties:
 - stable, deterministic IDs (per-page line ids; global word ids)
 - monotonic reading order (useful for windowing and debugging)
 - bounding boxes are stored in absolute page coordinates; consumers can normalize as needed
-

@@ -4,8 +4,8 @@ The reading view is the LLM-facing surface for grounding. It is built determinis
 
 ## Why a reading view exists
 
-- The LLM cannot “see” PDF layout reliably, and we do not want it to invent coordinates.
-- A stable, line-aware text representation keeps the model’s job narrow: *choose what text is relevant*, not *reconstruct layout*.
+- The LLM cannot "see" PDF layout reliably, and we do not want it to invent coordinates.
+- A stable, line-aware text representation keeps the model's job narrow: *choose what text is relevant*, not *reconstruct layout*.
 - Token indices make citations unambiguous and machine-checkable.
 
 ## Rendered format
@@ -28,4 +28,3 @@ To keep the surface predictable and bounded:
 - Clamp total characters (default: 180k).
 
 When clamping happens, downstream mapping still works for spans that remain in-range; spans outside the clamped window are rejected.
-

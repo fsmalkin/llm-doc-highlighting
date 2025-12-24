@@ -6,6 +6,8 @@ This repo captures a document highlighting pipeline that converts unstructured d
 
 The design is intentionally preprocessing-first: expensive or fragile steps (parsing, OCR, geometry extraction) happen once per document/config and are cached. Downstream logic operates on stable artifacts rather than re-parsing the source file.
 
+> **Prominent next step:** investigate a two-pass resolver to avoid sending a full-document, word-token-indexed reading view to the expensive model. See `docs/next-steps.md`.
+
 ## Core outcomes
 
 1. Chunked text + coarse groundings (optional provider-backed)
@@ -19,7 +21,7 @@ The design is intentionally preprocessing-first: expensive or fragile steps (par
    - Renders the geometry index into a line-aware reading view with stable global token indices.
 5. Span citation mapping
    - The LLM returns citations as `{ start_token, end_token, start_text, end_text, substr }`.
-   - We validate and (optionally) snap spans using the guard tokens, then map spans → `word_ids` → geometry.
+   - We validate and (optionally) snap spans using the guard tokens, then map spans -> `word_ids` -> geometry.
 6. Deterministic fallback
    - When the LLM is unavailable or span validation fails, a simple deterministic matcher can still resolve some citations.
 

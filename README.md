@@ -5,8 +5,10 @@ This repository is a documentation-first snapshot of a document processing pipel
 Core ideas implemented here:
 - Preprocessing-first artifacts: parse/chunk once, cache, and reuse.
 - LLM-indexed reading view: build a full-document reading view with stable global token indices tied to geometry (`word_id`).
-- Span-based citations: the model cites using `start_token`/`end_token` over that reading view, and we deterministically map spans → `word_ids` → geometry.
+- Span-based citations: the model cites using `start_token`/`end_token` over that reading view, and we deterministically map spans -> `word_ids` -> geometry.
 - Deterministic fallback: when LLM is unavailable or returns invalid spans, fall back to simple deterministic matching.
+
+> **Prominent next step:** the full-document, word-token-indexed reading view is intentionally unambiguous, but it inflates token count. The next experiment is a two-pass resolver (coarse localization -> fine span citation) to reduce expensive-model tokens while preserving grounding. See `docs/next-steps.md`.
 
 ## Quickstart (local)
 
@@ -49,4 +51,5 @@ python scripts\resolve_highlight.py --doc path\to\document.pdf --doc_hash <hash>
 - `docs/pipeline.md` - Phase 1 and Phase 2, inputs/outputs, artifacts
 - `docs/data-model.md` - canonical JSON schema and invariants
 - `docs/runbook.md` - end-to-end runs and expected artifacts
+- `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach

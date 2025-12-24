@@ -27,6 +27,8 @@ Inputs:
 - `doc_hash` (to load Phase 1 artifacts)
 - a query (LLM-first) or a citation substring (fallback)
 
+> **Cost note:** the current approach can be token-heavy because it annotates every word token in the reading view. A proposed evolution is a two-pass resolver (coarse -> fine) to reduce expensive-model tokens. See `docs/next-steps.md`.
+
 Outputs:
 - a highlight object (or a canonical JSON file) with:
   - context polygons (coarse)
@@ -40,7 +42,13 @@ LLM-first (token-indexed reading view):
   - `start_token` / `end_token` (inclusive), plus
   - `start_text` / `end_text` guard tokens, plus
   - `substr` (verbatim span text).
-- We validate and (optionally) snap spans using guard tokens, then map spans → `word_ids` → geometry.
+- We validate and (optionally) snap spans using guard tokens, then map spans -> `word_ids` -> geometry.
 
 Deterministic fallback:
 - When the LLM is unavailable (no key) or returns invalid spans, fall back to exact substring matching on line text and map to a contiguous token window when possible.
+
+## Next experiment: two-pass resolver
+
+See `docs/next-steps.md` for a proposal to reduce token cost by running:
+- Pass 1 (coarse): locate a relevant region without word-level token markup
+- Pass 2 (fine): produce strict `start_token`/`end_token` spans only inside that region
