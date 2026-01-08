@@ -129,24 +129,26 @@ def _synthesize_chunks_without_provider(src_path: pathlib.Path) -> list[dict[str
     if page_words:
         chunk_idx = 1
         for page_num, words in sorted(page_words.items(), key=lambda kv: kv[0]):
+            # fine_geometry._group_lines expects each word to include a "page" field.
+            words_with_page = [{**w, "page": int(page_num)} for w in (words or [])]
             try:
-                lines = fine_geometry._group_lines(words, split_on_gap=True)  # type: ignore[attr-defined]
+                lines = fine_geometry._group_lines(words_with_page, split_on_gap=True)  # type: ignore[attr-defined]
             except Exception:
                 lines = []
 
-            if not lines and words:
+            if not lines and words_with_page:
                 lines = [
                     {
-                        "bbox": fine_geometry._rect_union([tuple(w["bbox"]) for w in words]),  # type: ignore[attr-defined]
-                        "_words": words,
+                        "bbox": fine_geometry._rect_union([tuple(w["bbox"]) for w in words_with_page]),  # type: ignore[attr-defined]
+                        "_words": words_with_page,
                     }
                 ]
 
             for ln in lines:
                 bbox = ln.get("bbox") or [0, 0, 0, 0]
-                lwords = ln.get("_words") or words
-                sorted_words = sorted(lwords, key=lambda x: float(x.get("bbox", [0, 0, 0, 0])[0]))
-                txt = " ".join([w.get("text", "") for w in sorted_words]).strip()
+                lwords = ln.get("_words") or words_with_page
+                sorted_words = sorted(lwords, key=lambda x: float((x.get("bbox") or [0, 0, 0, 0])[0]))
+                txt = " ".join([str(w.get("text", "")) for w in sorted_words]).strip()
                 chunks.append(
                     {
                         "chunk_id": f"synthetic_{chunk_idx:04d}",

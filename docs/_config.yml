@@ -1,3 +1,10 @@
 title: llm-doc-highlighting
 theme: minima
 
+# Keep Markdown links (e.g. `overview.md`) working on both:
+# - GitHub (source browsing), and
+# - GitHub Pages (rendered site)
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true

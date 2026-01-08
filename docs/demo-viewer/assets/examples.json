@@ -1,0 +1,70 @@
+{
+  "title": "Pre-baked highlight examples",
+  "doc": {
+    "pdf": "assets/layout_demo.pdf",
+    "geometry": "assets/layout_demo.index.json"
+  },
+  "examples": [
+    {
+      "id": "date_snip",
+      "title": "Small snippet (date)",
+      "description": "A tight highlight over a short value.",
+      "color": "#7aa2f7",
+      "word_ids": ["w_000054"]
+    },
+    {
+      "id": "across_columns",
+      "title": "Across columns",
+      "description": "A single selection that lights up text in both columns on the same page.",
+      "color": "#f2cc60",
+      "word_ids": [
+        "w_000029",
+        "w_000030",
+        "w_000031",
+        "w_000032",
+        "w_000033",
+        "w_000034",
+        "w_000035",
+        "w_000036",
+        "w_000037",
+        "w_000038"
+      ]
+    },
+    {
+      "id": "table_row",
+      "title": "In tables (row/fields)",
+      "description": "A highlight over a label/value row (table-like layout).",
+      "color": "#7ee787",
+      "word_ids": ["w_000022", "w_000023"]
+    },
+    {
+      "id": "down_list",
+      "title": "Down lists",
+      "description": "A highlight spanning multiple list items and line wraps.",
+      "color": "#ff7b72",
+      "word_ids": [
+        "w_000057",
+        "w_000058",
+        "w_000059",
+        "w_000060",
+        "w_000061",
+        "w_000062",
+        "w_000063",
+        "w_000064",
+        "w_000065",
+        "w_000066",
+        "w_000067",
+        "w_000068",
+        "w_000069",
+        "w_000070",
+        "w_000071",
+        "w_000072",
+        "w_000073",
+        "w_000074",
+        "w_000075",
+        "w_000076",
+        "w_000077"
+      ]
+    }
+  ]
+}

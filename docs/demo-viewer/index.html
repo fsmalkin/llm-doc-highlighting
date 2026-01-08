@@ -1,0 +1,390 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Apryse Viewer Demo (Pre-baked Highlights)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #0b0d12;
+        --panel: #111622;
+        --text: #e6e9ef;
+        --muted: #aab3c0;
+        --border: #2a3350;
+        --accent: #7aa2f7;
+        --good: #7ee787;
+        --bad: #ff7b72;
+      }
+
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      .wrap {
+        height: 100vh;
+        display: grid;
+        grid-template-columns: 360px 1fr;
+      }
+
+      .panel {
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        padding: 16px 14px;
+        overflow: auto;
+      }
+
+      .viewer {
+        position: relative;
+        min-width: 0;
+      }
+
+      #wv {
+        position: absolute;
+        inset: 0;
+      }
+
+      h1 {
+        margin: 0 0 6px;
+        font-size: 16px;
+      }
+
+      p {
+        margin: 8px 0;
+        color: var(--muted);
+        line-height: 1.45;
+        font-size: 13px;
+      }
+
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size: 12px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 120px 1fr;
+        gap: 10px;
+        align-items: center;
+        margin: 10px 0;
+      }
+      label {
+        color: var(--muted);
+        font-size: 12px;
+      }
+      input {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 10px;
+        border-radius: 10px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        color: var(--text);
+        outline: none;
+      }
+      input:focus {
+        border-color: rgba(122, 162, 247, 0.75);
+        box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
+      }
+
+      .btns {
+        display: flex;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      button {
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        padding: 8px 10px;
+        border-radius: 10px;
+        cursor: pointer;
+        font-size: 13px;
+      }
+      button:hover {
+        border-color: rgba(122, 162, 247, 0.75);
+      }
+
+      .examples {
+        margin-top: 14px;
+        display: grid;
+        gap: 10px;
+      }
+      .ex {
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 10px 10px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+      .ex h2 {
+        margin: 0;
+        font-size: 13px;
+      }
+      .ex .desc {
+        margin: 6px 0 10px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .status {
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 12px;
+        border: 1px solid var(--border);
+        background: rgba(255, 255, 255, 0.03);
+        font-size: 12px;
+        color: var(--muted);
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+      .ok {
+        color: var(--good);
+      }
+      .bad {
+        color: var(--bad);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <aside class="panel">
+        <h1>Apryse viewer demo (pre-baked highlights)</h1>
+        <p>
+          This is a static GitHub Pages demo. It loads a PDF + a precomputed Geometry Index and shows how clicking an
+          example maps <span class="mono">word_ids</span> to highlight quads.
+        </p>
+        <p><a href="../index.html">Back to docs index</a></p>
+
+        <div class="row">
+          <label for="licenseKey">License key</label>
+          <input id="licenseKey" placeholder="optional" />
+        </div>
+        <div class="btns">
+          <button id="btnSaveKey">Save key</button>
+          <button id="btnClearKey">Clear key</button>
+        </div>
+        <p style="margin-top: 10px">
+          If you do not provide a key, Apryse may run in trial mode (watermarks/limits depending on your build).
+        </p>
+
+        <div class="examples" id="examples"></div>
+
+        <div class="btns" style="margin-top: 12px">
+          <button id="btnClear">Clear highlights</button>
+        </div>
+
+        <div id="status" class="status">Loading...</div>
+      </aside>
+
+      <main class="viewer">
+        <div id="wv"></div>
+      </main>
+    </div>
+
+    <script src="../webviewer/webviewer.min.js"></script>
+    <script>
+      const STORAGE_KEY = "apryse_license_key";
+
+      const statusEl = document.getElementById("status");
+      const examplesEl = document.getElementById("examples");
+      const licenseInput = document.getElementById("licenseKey");
+
+      function setStatus(msg, kind) {
+        statusEl.textContent = String(msg || "");
+        statusEl.classList.remove("ok", "bad");
+        if (kind) statusEl.classList.add(kind);
+      }
+
+      function hexToRgb(hex) {
+        const h = String(hex || "").trim();
+        const m = /^#?([0-9a-f]{6})$/i.exec(h);
+        if (!m) return { r: 122, g: 162, b: 247 };
+        const n = parseInt(m[1], 16);
+        return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+      }
+
+      function quadToApryseQuad(Core, q) {
+        const [TLx, TLy, BLx, BLy, TRx, TRy, BRx, BRy] = q.map(Number);
+        return new Core.Math.Quad(BLx, BLy, BRx, BRy, TRx, TRy, TLx, TLy);
+      }
+
+      function loadSavedKey() {
+        try {
+          return localStorage.getItem(STORAGE_KEY) || "";
+        } catch {
+          return "";
+        }
+      }
+
+      function saveKey(v) {
+        try {
+          localStorage.setItem(STORAGE_KEY, String(v || ""));
+        } catch {}
+      }
+
+      async function loadJson(url) {
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error(`Failed to fetch ${url}: ${res.status}`);
+        return await res.json();
+      }
+
+      async function main() {
+        licenseInput.value = loadSavedKey();
+
+        document.getElementById("btnSaveKey").addEventListener("click", () => {
+          saveKey(licenseInput.value);
+          setStatus("Saved key. Reload the page to re-initialize Apryse with it.", "ok");
+        });
+        document.getElementById("btnClearKey").addEventListener("click", () => {
+          saveKey("");
+          licenseInput.value = "";
+          setStatus("Cleared key. Reload the page to re-initialize Apryse without it.", "ok");
+        });
+
+        const config = await loadJson("./assets/examples.json");
+        const geom = await loadJson("./assets/layout_demo.index.json");
+
+        const wordById = new Map();
+        for (const pg of geom.pages || []) {
+          const pageNo = Number(pg.page) || 1;
+          for (const w of pg.words || []) {
+            if (!w?.id || !Array.isArray(w.quad) || w.quad.length !== 8) continue;
+            wordById.set(String(w.id), { page: pageNo, quad: w.quad.map(Number), text: String(w.text || "") });
+          }
+        }
+
+        // Build UI list first (even if viewer load is slow).
+        const examples = Array.isArray(config.examples) ? config.examples : [];
+        for (const ex of examples) {
+          const card = document.createElement("div");
+          card.className = "ex";
+          const h2 = document.createElement("h2");
+          h2.textContent = ex.title || ex.id;
+          const desc = document.createElement("div");
+          desc.className = "desc";
+          desc.textContent = ex.description || "";
+          const btn = document.createElement("button");
+          btn.textContent = "Show highlight";
+          btn.dataset.exampleId = String(ex.id);
+          card.appendChild(h2);
+          card.appendChild(desc);
+          card.appendChild(btn);
+          examplesEl.appendChild(card);
+        }
+
+        setStatus("Initializing viewer...");
+
+        const webviewerPath = new URL("../webviewer", window.location.href).href.replace(/\/$/, "");
+        const initialDoc = new URL("./assets/layout_demo.pdf", window.location.href).href;
+        const viewerConfig = {
+          path: webviewerPath,
+          initialDoc,
+          fullAPI: true,
+        };
+        const key = loadSavedKey();
+        if (key) viewerConfig.licenseKey = key;
+
+        const instance = await WebViewer(viewerConfig, document.getElementById("wv"));
+        const { Core } = instance;
+        const { documentViewer, annotationManager, Annotations } = Core || {};
+        if (!documentViewer || !annotationManager || !Annotations) {
+          throw new Error("Apryse instance unavailable (missing Core APIs).");
+        }
+
+        function clearDemoHighlights() {
+          const existing = annotationManager.getAnnotationsList?.() || [];
+          for (const a of existing) {
+            try {
+              if (a?.getCustomData?.("demo_hl") === "1") {
+                annotationManager.deleteAnnotation?.(a, false, true);
+              }
+            } catch {}
+          }
+        }
+
+        async function showExample(ex) {
+          clearDemoHighlights();
+
+          const ids = Array.isArray(ex.word_ids) ? ex.word_ids.map(String) : [];
+          const byPage = new Map();
+          for (const wid of ids) {
+            const rec = wordById.get(wid);
+            if (!rec) continue;
+            if (!byPage.has(rec.page)) byPage.set(rec.page, []);
+            byPage.get(rec.page).push(rec.quad);
+          }
+
+          const pages = Array.from(byPage.keys()).sort((a, b) => a - b);
+          if (!pages.length) {
+            setStatus(`No geometry found for example '${ex.id}'.`, "bad");
+            return;
+          }
+
+          const { r, g, b } = hexToRgb(ex.color);
+
+          let firstAnn = null;
+          for (const pageNo of pages) {
+            const hl = new Annotations.TextHighlightAnnotation();
+            hl.PageNumber = pageNo;
+            hl.Quads = byPage.get(pageNo).map((q) => quadToApryseQuad(Core, q));
+            hl.Color = new Annotations.Color(r, g, b);
+            hl.Opacity = 0.45;
+            hl.setCustomData?.("demo_hl", "1");
+            hl.setCustomData?.("demo_id", String(ex.id));
+            annotationManager.addAnnotation(hl);
+            annotationManager.redrawAnnotation(hl);
+            firstAnn = firstAnn || hl;
+          }
+
+          // Navigate to first page/annotation
+          const firstPage = pages[0];
+          documentViewer.setCurrentPage?.(firstPage);
+          requestAnimationFrame(() => {
+            try {
+              const dvJump = documentViewer.jumpToAnnotation;
+              if (typeof dvJump === "function" && firstAnn) {
+                dvJump.call(documentViewer, firstAnn, { animate: true });
+              } else if (typeof documentViewer.scrollToAnnotation === "function" && firstAnn) {
+                documentViewer.scrollToAnnotation(firstAnn, { animate: true });
+              }
+            } catch {}
+          });
+
+          setStatus(
+            `Rendered '${ex.title || ex.id}'.\\n` +
+              `pages=${pages.join(", ")}\\n` +
+              `word_ids=${ids.length} (resolved=${ids.filter((w) => wordById.has(w)).length})`,
+            "ok"
+          );
+        }
+
+        document.getElementById("btnClear").addEventListener("click", () => {
+          clearDemoHighlights();
+          setStatus("Cleared demo highlights.", "ok");
+        });
+
+        examplesEl.addEventListener("click", (e) => {
+          const btn = e.target?.closest?.("button");
+          if (!btn) return;
+          const id = btn.dataset.exampleId;
+          const ex = examples.find((x) => String(x.id) === String(id));
+          if (ex) showExample(ex);
+        });
+
+        setStatus("Viewer ready. Click an example to render highlights.", "ok");
+      }
+
+      main().catch((err) => {
+        console.error(err);
+        setStatus(String(err?.message || err), "bad");
+      });
+    </script>
+  </body>
+</html>
