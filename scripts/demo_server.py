@@ -87,6 +87,14 @@ def _reading_view_nonempty(geom_path: pathlib.Path) -> bool:
         return False
 
 
+def _rails_source(geom_path: pathlib.Path) -> str:
+    try:
+        meta = json.loads(geom_path.read_text(encoding="utf-8")).get("meta") or {}
+        return str(meta.get("source") or "")
+    except Exception:
+        return ""
+
+
 def _ensure_preprocess(*, prefer_ocr: bool | None = None) -> Tuple[str, pathlib.Path]:
     if not PDF_PATH.exists():
         raise FileNotFoundError(f"Missing PDF: {PDF_PATH}")
@@ -99,8 +107,12 @@ def _ensure_preprocess(*, prefer_ocr: bool | None = None) -> Tuple[str, pathlib.
     doc_hash = _compute_doc_hash(ocr_enabled=ocr_enabled, ade_enabled=ade_enabled)
     cache_dir = CACHE_ROOT / doc_hash
     geom_path = cache_dir / "geometry_index.json"
+    vision_primary = os.getenv("VISION_RAILS_PRIMARY", "1") != "0"
     if geom_path.exists() and _reading_view_nonempty(geom_path):
-        return doc_hash, cache_dir
+        if vision_primary and _rails_source(geom_path) != "vision":
+            pass
+        else:
+            return doc_hash, cache_dir
 
     cache_dir.mkdir(parents=True, exist_ok=True)
 
