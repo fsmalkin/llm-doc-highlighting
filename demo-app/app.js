@@ -1,4 +1,4 @@
-const DEFAULT_QUESTION = "What is the patient name?";
+const DEFAULT_QUESTION = "What is the date of visit?";
 const DEFAULT_DOC = "./assets/Physician_Report_Scanned.pdf";
 
 const statusEl = document.getElementById("status");

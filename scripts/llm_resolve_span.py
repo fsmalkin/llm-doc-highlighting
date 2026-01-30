@@ -64,7 +64,39 @@ def _openai_model() -> str:
     return os.getenv("OPENAI_MODEL") or "gpt-4o-mini"
 
 
-def _call_openai_chat(messages: List[Dict[str, str]], *, model: str) -> str:
+def _is_gpt5_model(model: str) -> bool:
+    m = str(model or "").lower()
+    return m.startswith("gpt-5")
+
+
+def _extract_response_text(data: Dict[str, Any]) -> str:
+    if isinstance(data.get("output_text"), str) and data.get("output_text"):
+        return str(data["output_text"])
+    outputs = data.get("output") or []
+    if isinstance(outputs, list):
+        for item in outputs:
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") != "message":
+                continue
+            content = item.get("content")
+            if isinstance(content, str) and content:
+                return str(content)
+            if isinstance(content, list):
+                parts = []
+                for block in content:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") in {"output_text", "text"}:
+                        txt = block.get("text")
+                        if isinstance(txt, str) and txt:
+                            parts.append(txt)
+                if parts:
+                    return "\n".join(parts)
+    return ""
+
+
+def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature: Optional[float]) -> str:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("Missing OPENAI_API_KEY (set it in .env or your environment).")
@@ -73,8 +105,9 @@ def _call_openai_chat(messages: List[Dict[str, str]], *, model: str) -> str:
     payload: Dict[str, Any] = {
         "model": model,
         "messages": messages,
-        "temperature": 0,
     }
+    if temperature is not None:
+        payload["temperature"] = temperature
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     resp = requests.post(url, headers=headers, json=payload, timeout=180)
     resp.raise_for_status()
@@ -208,13 +241,12 @@ def main() -> None:
     )
 
     model = str(args.model or _openai_model())
-    raw = _call_openai_chat(
-        messages=[
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-        model=model,
-    )
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+    temp = None if _is_gpt5_model(model) else 0
+    raw = _call_openai_chat(messages=messages, model=model, temperature=temp)
     obj = _extract_json_obj(raw)
 
     citations = obj.get("citations")

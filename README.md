@@ -75,6 +75,9 @@ Walkthrough:
 2) Enter a question and click "Ask".
 3) The answer and source snippet appear; highlights render in the viewer.
 
+Example question:
+- What is the date of visit?
+
 ## Docs
 
 - `docs/overview.md` - what exists and how it fits together
