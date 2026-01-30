@@ -9,11 +9,14 @@ Goal: ship a small web app that lets a user query a fixed local document via the
 
 Deliverables
 - A simple web app in-repo (static UI + local API) that:
-  - targets the fixed PDF path: C:\Users\afutu\OneDrive\Desktop\Test Files\Evidence\Physician_Report_Scanned.pdf
+  - targets the fixed PDF path: demo-app\assets\Physician_Report_Scanned.pdf
   - lets the user enter a question
   - runs Phase 1 preprocessing to build cache artifacts (once)
   - runs the existing LLM span resolver (no model changes)
   - renders highlights in the Apryse viewer and shows answer + source snippet
+- Transparency in the demo UI:
+  - show the LLM request and raw response payloads
+  - show a "why this highlight" summary (token range, lines, pages, word_id count)
 - Clear documentation that users must bring their own LLM API key
 - A happy-path walkthrough using one sample document
 

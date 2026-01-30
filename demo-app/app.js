@@ -5,6 +5,9 @@ const statusEl = document.getElementById("status");
 const answerEl = document.getElementById("answer");
 const sourceTextEl = document.getElementById("sourceText");
 const sourceMetaEl = document.getElementById("sourceMeta");
+const whySummaryEl = document.getElementById("whySummary");
+const llmRequestEl = document.getElementById("llmRequest");
+const llmResponseEl = document.getElementById("llmResponse");
 const debugEl = document.getElementById("debug");
 const questionEl = document.getElementById("question");
 const keyStatusEl = document.getElementById("keyStatus");
@@ -37,6 +40,28 @@ function setAnswer(text) {
 function setSource(text, meta) {
   sourceTextEl.textContent = text ? String(text) : "-";
   sourceMetaEl.textContent = meta ? String(meta) : "-";
+}
+
+function setWhy(text) {
+  if (!whySummaryEl) return;
+  whySummaryEl.textContent = text ? String(text) : "-";
+}
+
+function setLlmLog(trace) {
+  if (!llmRequestEl || !llmResponseEl) return;
+  if (!trace) {
+    llmRequestEl.textContent = "-";
+    llmResponseEl.textContent = "-";
+    return;
+  }
+  const req = trace.request || {};
+  const resp = trace.response || {};
+  llmRequestEl.textContent = JSON.stringify(req, null, 2);
+  if (typeof resp === "string") {
+    llmResponseEl.textContent = resp;
+  } else {
+    llmResponseEl.textContent = JSON.stringify(resp, null, 2);
+  }
 }
 
 function setDebug(obj) {
@@ -76,6 +101,42 @@ async function postJson(url, body) {
 
 function normalizeBool(value) {
   return value === true || value === "1" || value === 1;
+}
+
+function clampText(text, maxLen) {
+  const raw = String(text || "");
+  if (raw.length <= maxLen) return raw;
+  return `${raw.slice(0, maxLen)}...`;
+}
+
+function buildWhySummary(data) {
+  const citation = data?.citation || {};
+  const span = data?.span || {};
+  const mapped = data?.mapped || {};
+  const parts = [];
+
+  if (citation.start_token != null && citation.end_token != null) {
+    parts.push(`Tokens: ${citation.start_token}-${citation.end_token}`);
+  }
+  const lineRange = span?.line_range || {};
+  if (lineRange.start_line_no != null && lineRange.end_line_no != null) {
+    parts.push(`Lines: ${lineRange.start_line_no}-${lineRange.end_line_no}`);
+  }
+  const wordIds = Array.isArray(mapped.word_ids) ? mapped.word_ids : [];
+  if (wordIds.length) {
+    parts.push(`Word ids: ${wordIds.length}`);
+  }
+  const pages = Array.isArray(mapped.pages) ? mapped.pages : [];
+  const pageNums = pages.map((p) => p?.page).filter(Boolean);
+  if (pageNums.length) {
+    parts.push(`Pages: ${pageNums.join(", ")}`);
+  }
+  const spanText = citation.substr;
+  if (spanText) {
+    parts.push(`Span text: "${clampText(spanText, 200)}"`);
+  }
+
+  return parts.length ? parts.join("\n") : "-";
 }
 
 async function refreshStatus() {
@@ -220,6 +281,8 @@ async function askQuestion() {
   btnAsk.disabled = true;
   setAnswer("-");
   setSource("-", "-");
+  setWhy("-");
+  setLlmLog(null);
 
   try {
     if (toggleAutoPrepareEl?.checked) {
@@ -247,6 +310,8 @@ async function askQuestion() {
       if (pnums.length) metaParts.push(`pages ${pnums.join(", ")}`);
     }
     setSource(sourceText, metaParts.join(" | ") || "-");
+    setWhy(buildWhySummary(data));
+    setLlmLog(data?.trace);
     setDebug(data);
 
     const result = renderHighlights(pages);
@@ -285,6 +350,8 @@ toggleOcrEl?.addEventListener("change", () => refreshStatus());
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");
 setSource("-", "-");
+setWhy("-");
+setLlmLog(null);
 setDebug(null);
 
 initViewer()

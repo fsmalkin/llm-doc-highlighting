@@ -212,6 +212,7 @@ def main() -> None:
     ap.add_argument("--query", required=True, help="What to find/answer; the model must cite a single span")
     ap.add_argument("--model", default=None, help="Override model (default: OPENAI_MODEL or gpt-4o-mini)")
     ap.add_argument("--out", default=None, help="Optional output path (default: artifacts/llm_resolve/<doc_hash>/<slug>.json)")
+    ap.add_argument("--trace", action="store_true", help="Include LLM request/response in output JSON")
     args = ap.parse_args()
 
     pdf_path = pathlib.Path(args.doc)
@@ -248,6 +249,20 @@ def main() -> None:
     temp = None if _is_gpt5_model(model) else 0
     raw = _call_openai_chat(messages=messages, model=model, temperature=temp)
     obj = _extract_json_obj(raw)
+    trace = None
+    if args.trace:
+        trace = {
+            "request": {
+                "model": model,
+                "temperature": temp,
+                "base_url": _openai_base_url(),
+                "messages": messages,
+            },
+            "response": {
+                "text": raw,
+                "parsed": obj,
+            },
+        }
 
     citations = obj.get("citations")
     if not isinstance(citations, list) or not citations:
@@ -354,6 +369,8 @@ def main() -> None:
             "reading_view_preview": ctx.get("reading_view_preview"),
         },
     }
+    if trace is not None:
+        out["trace"] = trace
 
     if args.out:
         out_path = pathlib.Path(args.out)

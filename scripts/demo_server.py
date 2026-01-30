@@ -157,7 +157,12 @@ def _slugify(text: str) -> str:
     return clean[:64] or "query"
 
 
-def _run_llm(question: str, *, prefer_ocr: bool | None = None) -> Dict[str, Any]:
+def _run_llm(
+    question: str,
+    *,
+    prefer_ocr: bool | None = None,
+    trace: bool = False,
+) -> Dict[str, Any]:
     doc_hash, _cache_dir = _ensure_preprocess(prefer_ocr=prefer_ocr)
 
     model = os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
@@ -179,6 +184,8 @@ def _run_llm(question: str, *, prefer_ocr: bool | None = None) -> Dict[str, Any]
         "--out",
         str(out_path),
     ]
+    if trace:
+        cmd.append("--trace")
     proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
     if proc.returncode != 0:
         msg = proc.stderr.strip() or proc.stdout.strip() or "LLM resolver failed"
@@ -309,8 +316,11 @@ class DemoHandler(SimpleHTTPRequestHandler):
         prefer_ocr = None
         if "ocr" in body:
             prefer_ocr = str(body.get("ocr", "0")).strip() == "1"
+        trace_enabled = _read_env_flag("DEMO_TRACE_LLM", "1")
+        if "trace" in body:
+            trace_enabled = str(body.get("trace", "0")).strip() == "1"
         try:
-            data = _run_llm(question, prefer_ocr=prefer_ocr)
+            data = _run_llm(question, prefer_ocr=prefer_ocr, trace=trace_enabled)
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return
@@ -326,6 +336,7 @@ class DemoHandler(SimpleHTTPRequestHandler):
             "span": data.get("span"),
             "mapped": data.get("mapped"),
             "meta": data.get("meta"),
+            "trace": data.get("trace"),
         }
         self._send_json(resp)
 

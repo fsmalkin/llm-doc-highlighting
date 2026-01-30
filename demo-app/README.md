@@ -20,6 +20,8 @@ UI affordances:
 - A Quick Start checklist shows whether the key, rails, OCR, cache, and model are detected.
 - Toggle "Force OCR rails" to prefer OCR text/geometry for preprocessing.
 - "Auto-prepare" makes the Ask button build cache automatically if needed.
+- "LLM request/response" log shows the exact prompt and raw reply.
+- "Why this highlight" summarizes tokens, lines, pages, and word_id count.
 
 ## Run
 

@@ -227,6 +227,32 @@ button:disabled {
   color: var(--muted);
 }
 
+.why {
+  font-size: 12px;
+  line-height: 1.4;
+  color: #e2e6f0;
+  white-space: pre-wrap;
+}
+
+.log {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: pre-wrap;
+  max-height: 240px;
+  overflow: auto;
+}
+
+details summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .debug {
   margin-top: 8px;
   font-size: 11px;
