@@ -234,6 +234,25 @@ def main() -> None:
         logger("geometry", {"reason": "geometry_failed", "meta": {"error": str(e)}})
         raise
 
+    # Rails primary: require Vision rails unless explicitly disabled.
+    vision_primary = os.getenv("VISION_RAILS_PRIMARY", "1") != "0"
+    if os.getenv("RAILS_REQUIRED", "1") != "0" and vision_primary:
+        meta_path = cache_dir / "geometry_meta.json"
+        meta = {}
+        if meta_path.exists():
+            try:
+                meta = json.loads(meta_path.read_text(encoding="utf-8"))
+            except Exception:
+                meta = {}
+        words_source = str(meta.get("words_source") or "")
+        if not words_source.startswith("vision"):
+            reason = meta.get("words_source_reason") or meta.get("vision_reason") or "vision_unavailable"
+            logger("geometry_index", {"reason": "vision_required", "meta": {"source": words_source, "error": reason}})
+            raise RuntimeError(
+                "Vision rails required. Set GOOGLE_APPLICATION_CREDENTIALS and install google-cloud-vision, "
+                "or set VISION_RAILS_PRIMARY=0 to allow fallback."
+            )
+
     # 3) Sentence index
     try:
         sentence_indexer.run(cache_dir / "ade_chunks.json", cache_dir, logger=logger)

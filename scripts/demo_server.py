@@ -331,6 +331,15 @@ class DemoHandler(SimpleHTTPRequestHandler):
             cache_dir = CACHE_ROOT / doc_hash
             geom_path = cache_dir / "geometry_index.json"
             rails_ok = bool(geom_path.exists() and _reading_view_nonempty(geom_path))
+            rails_source = None
+            rails_reason = None
+            if geom_path.exists():
+                try:
+                    meta = json.loads(geom_path.read_text(encoding="utf-8")).get("meta") or {}
+                    rails_source = meta.get("source")
+                    rails_reason = meta.get("source_reason") or meta.get("vision_reason")
+                except Exception:
+                    pass
 
             key_present = bool(os.getenv("OPENAI_API_KEY"))
             model = os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
@@ -345,6 +354,8 @@ class DemoHandler(SimpleHTTPRequestHandler):
                     "ocr_enabled": prefer_ocr,
                     "rails_required": rails_required,
                     "rails_ok": rails_ok,
+                    "rails_source": rails_source,
+                    "rails_reason": rails_reason,
                     "cache_ready": bool(cache_dir.exists() and geom_path.exists()),
                     "doc_hash": doc_hash,
                     "doc": str(PDF_PATH),

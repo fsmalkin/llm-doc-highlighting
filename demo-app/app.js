@@ -13,6 +13,7 @@ const questionEl = document.getElementById("question");
 const valueTypeEl = document.getElementById("valueType");
 const keyStatusEl = document.getElementById("keyStatus");
 const railsStatusEl = document.getElementById("railsStatus");
+const railsSourceEl = document.getElementById("railsSource");
 const ocrStatusEl = document.getElementById("ocrStatus");
 const cacheStatusEl = document.getElementById("cacheStatus");
 const modelStatusEl = document.getElementById("modelStatus");
@@ -210,6 +211,9 @@ async function refreshStatus() {
       railsOk ? (railsRequired ? "required ok" : "ok") : railsRequired ? "required" : "optional",
       railsOk ? "good" : railsRequired ? "bad" : "warn"
     );
+    const railsSource = data?.rails_source || "-";
+    const railsSourceKind = String(railsSource).startsWith("vision") ? "good" : "warn";
+    setBadge(railsSourceEl, railsSource, railsSourceKind);
 
     const ocrEnabled = normalizeBool(data?.ocr_enabled);
     setBadge(ocrStatusEl, ocrEnabled ? "enabled" : "off", ocrEnabled ? "good" : "warn");
@@ -240,6 +244,7 @@ async function refreshStatus() {
     }
     setBadge(keyStatusEl, "unknown", "warn");
     setBadge(railsStatusEl, "unknown", "warn");
+    setBadge(railsSourceEl, "unknown", "warn");
     setBadge(ocrStatusEl, "unknown", "warn");
     setBadge(cacheStatusEl, "unknown", "warn");
     setBadge(modelStatusEl, "unknown", "warn");

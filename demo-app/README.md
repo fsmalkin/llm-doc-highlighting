@@ -13,8 +13,8 @@ Default model: gpt-5-mini
 
 Rails policy:
 - Geometry Index is always built for highlights.
-- Vision rails are preferred when credentials are present (GOOGLE_APPLICATION_CREDENTIALS).
-- Otherwise, use the PDF text layer or enable OCR fallback (OCR_ENABLED=1).
+- Vision rails are the primary method when credentials are present (GOOGLE_APPLICATION_CREDENTIALS).
+- Set VISION_RAILS_PRIMARY=0 to allow fallback to the PDF text layer or OCR (OCR_ENABLED=1).
 If the reading view is empty, the demo server will retry preprocessing with OCR enabled.
 
 UI affordances:

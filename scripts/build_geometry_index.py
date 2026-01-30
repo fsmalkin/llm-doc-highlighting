@@ -349,10 +349,24 @@ def build_geometry_index(
             }
         )
 
+    meta = {"source": "ocr|pdf", "version": "geometry-index/0.1"}
+    try:
+        meta_path = pathlib.Path(fine_path).with_name("geometry_meta.json")
+        if meta_path.exists():
+            meta_raw = json.loads(meta_path.read_text(encoding="utf-8"))
+            if isinstance(meta_raw, dict):
+                meta["source"] = str(meta_raw.get("words_source") or meta["source"])
+                meta["source_reason"] = meta_raw.get("words_source_reason")
+                meta["vision_enabled"] = meta_raw.get("vision_enabled")
+                meta["vision_reason"] = meta_raw.get("vision_reason")
+                meta["ocr_enabled"] = meta_raw.get("ocr_enabled")
+    except Exception:
+        pass
+
     geom_index = {
         "doc": doc_name,
         "pages": out_pages,
-        "meta": {"source": "ocr|pdf", "version": "geometry-index/0.1"},
+        "meta": meta,
     }
     return geom_index
 

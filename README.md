@@ -30,11 +30,12 @@ python -m pip install -r requirements-ocr.txt
 Environment:
 - Create `.env` (git-ignored) for secrets from `.env.example`.
 - Create `.env.local` (git-ignored) for non-secret config from `.env.local.example`.
-  - For the demo and LLM resolver, set `OPENAI_API_KEY` in `.env`.
-  - Set `OPENAI_MODEL` in `.env.local` (demo default is `gpt-5-mini`).
-  - Rails are always required. If available, Vision rails are preferred:
-    - Set `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to your service account JSON.
-    - If Vision is unavailable, enable OCR fallback with `OCR_ENABLED=1` in `.env.local` (Tesseract).
+- For the demo and LLM resolver, set `OPENAI_API_KEY` in `.env`.
+- Set `OPENAI_MODEL` in `.env.local` (demo default is `gpt-5-mini`).
+- Rails are always required. If available, Vision rails are preferred:
+  - Set `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to your service account JSON.
+  - Vision rails are the primary method; set `VISION_RAILS_PRIMARY=0` to allow fallback.
+  - If Vision is unavailable and fallback is allowed, enable OCR with `OCR_ENABLED=1` in `.env.local` (Tesseract).
 
 Run Phase 1 preprocessing:
 ```bash

@@ -19,7 +19,8 @@ Artifacts (typical):
 Notes:
 - `doc_hash` is computed from file bytes + a config signature so toggling OCR/providers creates a new cache key.
 - Rails are required for highlights: always build a Geometry Index.
-- Vision rails are preferred when credentials are present; Tesseract OCR is the fallback for sparse/no text layer.
+- Vision rails are the primary method when credentials are present; set VISION_RAILS_PRIMARY=0 to allow fallback.
+- Tesseract OCR is the fallback for sparse/no text layer when fallback is allowed.
 
 ## Phase 2: Resolve (highlight mapping)
 

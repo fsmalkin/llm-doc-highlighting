@@ -612,6 +612,25 @@ def run(pdf_path: str, ade_chunks_path: pathlib.Path, cache_dir: pathlib.Path, o
         if not words_source_reason:
             words_source_reason = "fallback_text_layer" if fitz is not None else "fitz_unavailable"
 
+    meta = {
+        "words_source": words_source,
+        "words_source_reason": words_source_reason,
+        "vision_enabled": vision_enabled,
+        "vision_reason": vision_reason,
+        "vision_scale": vision_scale,
+        "vision_split_on_gap": vision_split_on_gap,
+        "vision_gap_ratio": vision_gap_ratio,
+        "ocr_enabled": bool(ocr_enabled),
+        "ocr_langs": os.getenv("OCR_LANGS", "").strip() or None,
+        "ocr_dpi": os.getenv("OCR_DPI", "200"),
+    }
+    try:
+        (cache_dir / "geometry_meta.json").write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
+    except Exception:
+        pass
+    if logger:
+        logger("geometry_meta", {"meta": meta})
+
     # Page sizes for normalized(0..1) -> absolute conversion
     page_sizes: Dict[int, Tuple[float, float]] = {}
     if fitz is not None:
