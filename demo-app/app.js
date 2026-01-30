@@ -105,6 +105,12 @@ async function refreshStatus() {
     setDebug(data);
     return data;
   } catch (err) {
+    const isFile = window.location.protocol === "file:";
+    if (isFile) {
+      setStatus("Status API unreachable. Open http://127.0.0.1:8000/ (not a file URL).", "bad");
+    } else {
+      setStatus(`Status API error: ${err.message}`, "bad");
+    }
     setBadge(keyStatusEl, "unknown", "warn");
     setBadge(railsStatusEl, "unknown", "warn");
     setBadge(ocrStatusEl, "unknown", "warn");
