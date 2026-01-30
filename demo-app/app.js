@@ -21,12 +21,16 @@ const toggleAutoPrepareEl = document.getElementById("toggleAutoPrepare");
 const btnPrepare = document.getElementById("btnPrepare");
 const btnAsk = document.getElementById("btnAsk");
 const btnClear = document.getElementById("btnClear");
+const stepPrepareEl = document.getElementById("stepPrepare");
+const stepAskEl = document.getElementById("stepAsk");
 
 let viewerInstance = null;
 let annotationManager = null;
 let documentViewer = null;
 let Core = null;
 let Annotations = null;
+let cacheReady = false;
+let preparing = false;
 
 function setStatus(msg, kind) {
   statusEl.textContent = String(msg || "");
@@ -73,6 +77,12 @@ function setBadge(el, text, kind) {
   el.textContent = text || "-";
   el.classList.remove("good", "bad", "warn");
   if (kind) el.classList.add(kind);
+}
+
+function setStepState(el, state) {
+  if (!el) return;
+  el.classList.remove("active", "done");
+  if (state) el.classList.add(state);
 }
 
 async function getJson(url) {
@@ -159,6 +169,7 @@ async function refreshStatus() {
 
     const cacheReady = normalizeBool(data?.cache_ready);
     setBadge(cacheStatusEl, cacheReady ? "ready" : "missing", cacheReady ? "good" : "warn");
+    updateFlow(cacheReady);
 
     const model = data?.model || "-";
     setBadge(modelStatusEl, model, "good");
@@ -178,7 +189,26 @@ async function refreshStatus() {
     setBadge(cacheStatusEl, "unknown", "warn");
     setBadge(modelStatusEl, "unknown", "warn");
     setDebug({ error: err.message });
+    updateFlow(false);
     return null;
+  }
+}
+
+function updateFlow(isReady) {
+  cacheReady = !!isReady;
+  if (cacheReady) {
+    setStepState(stepPrepareEl, "done");
+    setStepState(stepAskEl, "active");
+    btnAsk.disabled = false;
+    btnAsk.classList.add("primary");
+    btnPrepare.classList.remove("primary");
+  } else {
+    setStepState(stepPrepareEl, "active");
+    setStepState(stepAskEl, "");
+    const autoPrep = !!toggleAutoPrepareEl?.checked;
+    btnAsk.disabled = !autoPrep;
+    btnPrepare.classList.add("primary");
+    btnAsk.classList.remove("primary");
   }
 }
 
@@ -256,7 +286,9 @@ async function initViewer() {
 }
 
 async function prepareCache() {
+  if (preparing) return;
   setStatus("Preparing cache...", "");
+  preparing = true;
   btnPrepare.disabled = true;
   try {
     const data = await postJson("/api/preprocess", { ocr: toggleOcrEl?.checked ? 1 : 0 });
@@ -267,6 +299,7 @@ async function prepareCache() {
     setStatus(`Preprocess failed: ${err.message}`, "bad");
   } finally {
     btnPrepare.disabled = false;
+    preparing = false;
   }
 }
 
@@ -346,6 +379,7 @@ btnClear.addEventListener("click", () => {
   setStatus("Cleared highlights.", "ok");
 });
 toggleOcrEl?.addEventListener("change", () => refreshStatus());
+toggleAutoPrepareEl?.addEventListener("change", () => updateFlow(cacheReady));
 
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");
@@ -358,4 +392,8 @@ initViewer()
   .then(() => setStatus("Viewer ready.", "ok"))
   .catch((err) => setStatus(`Viewer failed: ${err.message}`, "bad"));
 
-refreshStatus();
+refreshStatus().then((status) => {
+  if (toggleAutoPrepareEl?.checked && !status?.cache_ready) {
+    prepareCache();
+  }
+});

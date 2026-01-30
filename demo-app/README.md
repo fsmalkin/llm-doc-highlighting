@@ -35,8 +35,8 @@ Then open:
 
 Walkthrough:
 1) Confirm the Quick Start checklist shows your key and rails.
-2) Click "Prepare cache" (or leave Auto-prepare on and just click Ask).
-3) Enter a question and click "Ask".
+2) Click "Prepare cache" (required once per document) or leave Auto-prepare on and just click Ask.
+3) Enter a question and click "Ask" once the cache is ready.
 3) The answer and source snippet appear; highlights render in the viewer.
 
 Example question:
