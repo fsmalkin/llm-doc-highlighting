@@ -19,8 +19,6 @@ If the reading view is empty, the demo server will retry preprocessing with OCR 
 
 UI affordances:
 - A System status chip summarizes readiness; expand for key, rails, OCR, cache, and model.
-- Toggle "Force OCR rails" to prefer OCR text/geometry for preprocessing.
-- "Auto-prepare" makes the Ask button build cache automatically if needed.
 - "LLM request/response" log shows the exact prompt and raw reply.
 - "Why this highlight" summarizes tokens, lines, pages, and word_id count.
 
@@ -35,9 +33,8 @@ Then open:
   http://127.0.0.1:8000/
 
 Walkthrough:
-1) Confirm the System status chip shows ready (expand for details).
-2) Click "Prepare cache" (required once per document) or leave Auto-prepare on and just click Ask.
-3) Enter a question and click "Ask" once the cache is ready.
+1) Confirm the System status chip shows preparing/ready (expand for details).
+2) Enter a question and click "Ask" (auto-prepares cache if needed).
 3) The answer and source snippet appear; highlights render in the viewer.
 
 Example question:

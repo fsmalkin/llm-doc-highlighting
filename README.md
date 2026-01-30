@@ -72,9 +72,8 @@ demo-app\assets\Physician_Report_Scanned.pdf
 ```
 
 Walkthrough:
-1) Check the System status chip (expand for key, rails, cache, model).
-2) Click "Prepare cache" (required once per document) or leave Auto-prepare on and just click Ask.
-3) Enter a question and click "Ask" once the cache is ready.
+1) Check the System status chip (ready/preparing).
+2) Enter a question and click "Ask" (the demo auto-prepares cache if needed).
 3) The answer and source snippet appear; highlights render in the viewer.
 
 Example question:

@@ -17,14 +17,9 @@ const cacheStatusEl = document.getElementById("cacheStatus");
 const modelStatusEl = document.getElementById("modelStatus");
 const systemStatusEl = document.getElementById("systemStatus");
 const statusDetailsEl = document.getElementById("statusDetails");
-const toggleOcrEl = document.getElementById("toggleOcr");
-const toggleAutoPrepareEl = document.getElementById("toggleAutoPrepare");
 
-const btnPrepare = document.getElementById("btnPrepare");
 const btnAsk = document.getElementById("btnAsk");
 const btnClear = document.getElementById("btnClear");
-const stepPrepareEl = document.getElementById("stepPrepare");
-const stepAskEl = document.getElementById("stepAsk");
 
 let viewerInstance = null;
 let annotationManager = null;
@@ -33,6 +28,7 @@ let Core = null;
 let Annotations = null;
 let cacheReady = false;
 let preparing = false;
+let preparePromise = null;
 
 function setStatus(msg, kind) {
   statusEl.textContent = String(msg || "");
@@ -88,12 +84,6 @@ function setSystemStatus(text, kind, openDetails) {
   if (statusDetailsEl && typeof openDetails === "boolean") {
     statusDetailsEl.open = openDetails;
   }
-}
-
-function setStepState(el, state) {
-  if (!el) return;
-  el.classList.remove("active", "done");
-  if (state) el.classList.add(state);
 }
 
 async function getJson(url) {
@@ -169,7 +159,6 @@ function updateSystemStatus(state) {
     ocrEnabled,
     model,
     preparing: isPreparing,
-    autoPrepare,
   } = state || {};
 
   if (isPreparing) {
@@ -182,7 +171,7 @@ function updateSystemStatus(state) {
 
   if (!keyPresent) hasError = true;
   if (railsRequired && !railsOk) hasError = true;
-  if (!isCacheReady && !autoPrepare) hasWarn = true;
+  if (!isCacheReady && !isPreparing) hasWarn = true;
   if (!ocrEnabled) hasWarn = true;
   if (!model) hasWarn = true;
 
@@ -197,8 +186,7 @@ function updateSystemStatus(state) {
 
 async function refreshStatus() {
   try {
-    const ocrParam = toggleOcrEl?.checked ? "1" : "0";
-    const data = await getJson(`/api/status?ocr=${ocrParam}`);
+    const data = await getJson("/api/status");
     const keyPresent = normalizeBool(data?.openai_key_present);
     setBadge(keyStatusEl, keyPresent ? "present" : "missing", keyPresent ? "good" : "bad");
 
@@ -213,9 +201,8 @@ async function refreshStatus() {
     const ocrEnabled = normalizeBool(data?.ocr_enabled);
     setBadge(ocrStatusEl, ocrEnabled ? "enabled" : "off", ocrEnabled ? "good" : "warn");
 
-    const cacheReady = normalizeBool(data?.cache_ready);
+    cacheReady = normalizeBool(data?.cache_ready);
     setBadge(cacheStatusEl, cacheReady ? "ready" : "missing", cacheReady ? "good" : "warn");
-    updateFlow(cacheReady);
 
     const model = data?.model || "-";
     setBadge(modelStatusEl, model, "good");
@@ -229,7 +216,6 @@ async function refreshStatus() {
       ocrEnabled,
       model,
       preparing,
-      autoPrepare: !!toggleAutoPrepareEl?.checked,
     });
     return data;
   } catch (err) {
@@ -245,27 +231,9 @@ async function refreshStatus() {
     setBadge(cacheStatusEl, "unknown", "warn");
     setBadge(modelStatusEl, "unknown", "warn");
     setDebug({ error: err.message });
-    updateFlow(false);
+    cacheReady = false;
     setSystemStatus("status unavailable", "warn", false);
     return null;
-  }
-}
-
-function updateFlow(isReady) {
-  cacheReady = !!isReady;
-  if (cacheReady) {
-    setStepState(stepPrepareEl, "done");
-    setStepState(stepAskEl, "active");
-    btnAsk.disabled = false;
-    btnAsk.classList.add("primary");
-    btnPrepare.classList.remove("primary");
-  } else {
-    setStepState(stepPrepareEl, "active");
-    setStepState(stepAskEl, "");
-    const autoPrep = !!toggleAutoPrepareEl?.checked;
-    btnAsk.disabled = !autoPrep;
-    btnPrepare.classList.add("primary");
-    btnAsk.classList.remove("primary");
   }
 }
 
@@ -405,22 +373,35 @@ async function initViewer() {
 }
 
 async function prepareCache() {
-  if (preparing) return;
   setStatus("Preparing cache...", "");
   preparing = true;
   updateSystemStatus({ preparing: true });
-  btnPrepare.disabled = true;
   try {
-    const data = await postJson("/api/preprocess", { ocr: toggleOcrEl?.checked ? 1 : 0 });
+    const data = await postJson("/api/preprocess", {});
     setStatus(`Cache ready. doc_hash=${data.doc_hash}`, "ok");
     setDebug(data);
+    cacheReady = true;
     await refreshStatus();
+    return true;
   } catch (err) {
     setStatus(`Preprocess failed: ${err.message}`, "bad");
+    throw err;
   } finally {
-    btnPrepare.disabled = false;
     preparing = false;
   }
+}
+
+function ensurePrepared() {
+  if (cacheReady) {
+    return Promise.resolve(true);
+  }
+  if (preparePromise) {
+    return preparePromise;
+  }
+  preparePromise = prepareCache().finally(() => {
+    preparePromise = null;
+  });
+  return preparePromise;
 }
 
 async function askQuestion() {
@@ -438,15 +419,12 @@ async function askQuestion() {
   setLlmLog(null);
 
   try {
-    if (toggleAutoPrepareEl?.checked) {
-      const status = await refreshStatus();
-      if (!status?.cache_ready) {
-        await prepareCache();
-      }
+    const status = await refreshStatus();
+    if (!status?.cache_ready) {
+      await ensurePrepared();
     }
     const data = await postJson("/api/ask", {
       question: q,
-      ocr: toggleOcrEl?.checked ? 1 : 0,
     });
     const answer = data?.answer || "";
     const citation = data?.citation || {};
@@ -492,14 +470,11 @@ async function askQuestion() {
   }
 }
 
-btnPrepare.addEventListener("click", () => prepareCache());
 btnAsk.addEventListener("click", () => askQuestion());
 btnClear.addEventListener("click", () => {
   clearHighlights();
   setStatus("Cleared highlights.", "ok");
 });
-toggleOcrEl?.addEventListener("change", () => refreshStatus());
-toggleAutoPrepareEl?.addEventListener("change", () => refreshStatus());
 
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");
@@ -513,7 +488,7 @@ initViewer()
   .catch((err) => setStatus(`Viewer failed: ${err.message}`, "bad"));
 
 refreshStatus().then((status) => {
-  if (toggleAutoPrepareEl?.checked && !status?.cache_ready) {
-    prepareCache();
+  if (!status?.cache_ready) {
+    ensurePrepared().catch(() => {});
   }
 });
