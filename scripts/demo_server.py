@@ -199,10 +199,11 @@ def _run_llm(
 
 class DemoHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
-        if self.path == "/api/status":
+        raw_path = urllib.parse.urlparse(self.path).path
+        if raw_path == "/api/status":
             self._handle_status()
             return
-        if self.path.startswith("/api/"):
+        if raw_path.startswith("/api/"):
             self._send_json({"ok": False, "error": "Use POST"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
             return
         super().do_GET()
