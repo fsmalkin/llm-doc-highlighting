@@ -34,7 +34,7 @@ let Annotations = null;
 let cacheReady = false;
 let preparing = false;
 let preparePromise = null;
-let mode = "indexed";
+let mode = "raw";
 
 function setStatus(msg, kind) {
   statusEl.textContent = String(msg || "");
@@ -538,7 +538,7 @@ setWhy("-");
 setLlmLog(null);
 setValueTypeIndicator(null);
 setDebug(null);
-setMode("indexed");
+setMode("raw");
 
 initViewer()
   .then(() => setStatus("Viewer ready.", "ok"))
