@@ -23,32 +23,38 @@
         </div>
 
         <div class="card">
-          <div class="label">Quick start</div>
-          <div class="checklist">
-            <div class="check-item">
-              <span class="check-label">Key detected</span>
-              <span id="keyStatus" class="badge">...</span>
+          <div class="label">System status</div>
+          <details id="statusDetails" class="status-details">
+            <summary>
+              <span id="systemStatus" class="badge">checking...</span>
+              <span class="muted">Expand for details</span>
+            </summary>
+            <div class="checklist">
+              <div class="check-item">
+                <span class="check-label">Key detected</span>
+                <span id="keyStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Rails</span>
+                <span id="railsStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">OCR</span>
+                <span id="ocrStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Cache</span>
+                <span id="cacheStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Model</span>
+                <span id="modelStatus" class="badge">...</span>
+              </div>
             </div>
-            <div class="check-item">
-              <span class="check-label">Rails</span>
-              <span id="railsStatus" class="badge">...</span>
-            </div>
-            <div class="check-item">
-              <span class="check-label">OCR</span>
-              <span id="ocrStatus" class="badge">...</span>
-            </div>
-            <div class="check-item">
-              <span class="check-label">Cache</span>
-              <span id="cacheStatus" class="badge">...</span>
-            </div>
-            <div class="check-item">
-              <span class="check-label">Model</span>
-              <span id="modelStatus" class="badge">...</span>
-            </div>
-          </div>
-          <p class="muted">
-            If a badge says "missing", set the value in <span class="mono">.env</span> and reload.
-          </p>
+            <p class="muted">
+              If a badge says "missing", set the value in <span class="mono">.env</span> and reload.
+            </p>
+          </details>
         </div>
 
         <div class="card">

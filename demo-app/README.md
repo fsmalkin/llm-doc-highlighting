@@ -18,7 +18,7 @@ Rails policy:
 If the reading view is empty, the demo server will retry preprocessing with OCR enabled.
 
 UI affordances:
-- A Quick Start checklist shows whether the key, rails, OCR, cache, and model are detected.
+- A System status chip summarizes readiness; expand for key, rails, OCR, cache, and model.
 - Toggle "Force OCR rails" to prefer OCR text/geometry for preprocessing.
 - "Auto-prepare" makes the Ask button build cache automatically if needed.
 - "LLM request/response" log shows the exact prompt and raw reply.
@@ -35,7 +35,7 @@ Then open:
   http://127.0.0.1:8000/
 
 Walkthrough:
-1) Confirm the Quick Start checklist shows your key and rails.
+1) Confirm the System status chip shows ready (expand for details).
 2) Click "Prepare cache" (required once per document) or leave Auto-prepare on and just click Ask.
 3) Enter a question and click "Ask" once the cache is ready.
 3) The answer and source snippet appear; highlights render in the viewer.
@@ -46,7 +46,7 @@ Example question:
 ## Optional automated UI check
 
 This repo includes a Playwright smoke test that starts the demo server,
-opens the UI, and confirms Quick Start badges populate:
+opens the UI, and confirms status badges populate:
 
   python scripts\\uat_demo_smoke.py
 

@@ -15,6 +15,8 @@ const railsStatusEl = document.getElementById("railsStatus");
 const ocrStatusEl = document.getElementById("ocrStatus");
 const cacheStatusEl = document.getElementById("cacheStatus");
 const modelStatusEl = document.getElementById("modelStatus");
+const systemStatusEl = document.getElementById("systemStatus");
+const statusDetailsEl = document.getElementById("statusDetails");
 const toggleOcrEl = document.getElementById("toggleOcr");
 const toggleAutoPrepareEl = document.getElementById("toggleAutoPrepare");
 
@@ -77,6 +79,15 @@ function setBadge(el, text, kind) {
   el.textContent = text || "-";
   el.classList.remove("good", "bad", "warn");
   if (kind) el.classList.add(kind);
+}
+
+function setSystemStatus(text, kind, openDetails) {
+  if (systemStatusEl) {
+    setBadge(systemStatusEl, text, kind);
+  }
+  if (statusDetailsEl && typeof openDetails === "boolean") {
+    statusDetailsEl.open = openDetails;
+  }
 }
 
 function setStepState(el, state) {
@@ -149,6 +160,41 @@ function buildWhySummary(data) {
   return parts.length ? parts.join("\n") : "-";
 }
 
+function updateSystemStatus(state) {
+  const {
+    keyPresent,
+    railsRequired,
+    railsOk,
+    cacheReady: isCacheReady,
+    ocrEnabled,
+    model,
+    preparing: isPreparing,
+    autoPrepare,
+  } = state || {};
+
+  if (isPreparing) {
+    setSystemStatus("preparing...", "warn", false);
+    return;
+  }
+
+  let hasError = false;
+  let hasWarn = false;
+
+  if (!keyPresent) hasError = true;
+  if (railsRequired && !railsOk) hasError = true;
+  if (!isCacheReady && !autoPrepare) hasWarn = true;
+  if (!ocrEnabled) hasWarn = true;
+  if (!model) hasWarn = true;
+
+  if (hasError) {
+    setSystemStatus("setup required", "bad", true);
+  } else if (hasWarn) {
+    setSystemStatus("needs attention", "warn", false);
+  } else {
+    setSystemStatus("ready", "good", false);
+  }
+}
+
 async function refreshStatus() {
   try {
     const ocrParam = toggleOcrEl?.checked ? "1" : "0";
@@ -175,6 +221,16 @@ async function refreshStatus() {
     setBadge(modelStatusEl, model, "good");
 
     setDebug(data);
+    updateSystemStatus({
+      keyPresent,
+      railsRequired,
+      railsOk,
+      cacheReady,
+      ocrEnabled,
+      model,
+      preparing,
+      autoPrepare: !!toggleAutoPrepareEl?.checked,
+    });
     return data;
   } catch (err) {
     const isFile = window.location.protocol === "file:";
@@ -190,6 +246,7 @@ async function refreshStatus() {
     setBadge(modelStatusEl, "unknown", "warn");
     setDebug({ error: err.message });
     updateFlow(false);
+    setSystemStatus("status unavailable", "warn", false);
     return null;
   }
 }
@@ -351,6 +408,7 @@ async function prepareCache() {
   if (preparing) return;
   setStatus("Preparing cache...", "");
   preparing = true;
+  updateSystemStatus({ preparing: true });
   btnPrepare.disabled = true;
   try {
     const data = await postJson("/api/preprocess", { ocr: toggleOcrEl?.checked ? 1 : 0 });
@@ -441,7 +499,7 @@ btnClear.addEventListener("click", () => {
   setStatus("Cleared highlights.", "ok");
 });
 toggleOcrEl?.addEventListener("change", () => refreshStatus());
-toggleAutoPrepareEl?.addEventListener("change", () => updateFlow(cacheReady));
+toggleAutoPrepareEl?.addEventListener("change", () => refreshStatus());
 
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");

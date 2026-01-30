@@ -120,6 +120,26 @@ body {
   background: rgba(249, 226, 175, 0.08);
 }
 
+.status-details summary {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+}
+
+.status-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.status-details summary::marker {
+  content: "";
+}
+
+.status-details .badge {
+  min-width: 110px;
+  font-weight: 600;
+}
+
 .label {
   font-size: 12px;
   color: var(--muted);
