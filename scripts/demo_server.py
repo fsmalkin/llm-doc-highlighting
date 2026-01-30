@@ -70,16 +70,33 @@ def _compute_doc_hash(*, ocr_enabled: bool, ade_enabled: bool) -> str:
     return h.hexdigest()
 
 
+def _read_env_flag(name: str, default: str = "0") -> bool:
+    return os.getenv(name, default).strip() == "1"
+
+
+def _reading_view_nonempty(geom_path: pathlib.Path) -> bool:
+    try:
+        import reading_view as rv  # type: ignore
+    except Exception:
+        return False
+    try:
+        ctx = rv.build_reading_view_context(geom_path)
+        text = str(ctx.get("reading_view_text") or "").strip()
+        return bool(text)
+    except Exception:
+        return False
+
+
 def _ensure_preprocess() -> Tuple[str, pathlib.Path]:
     if not PDF_PATH.exists():
         raise FileNotFoundError(f"Missing PDF: {PDF_PATH}")
 
-    ocr_enabled = False
+    ocr_enabled = _read_env_flag("PREPROCESS_OCR") or _read_env_flag("OCR_ENABLED")
     ade_enabled = False
     doc_hash = _compute_doc_hash(ocr_enabled=ocr_enabled, ade_enabled=ade_enabled)
     cache_dir = CACHE_ROOT / doc_hash
     geom_path = cache_dir / "geometry_index.json"
-    if geom_path.exists():
+    if geom_path.exists() and _reading_view_nonempty(geom_path):
         return doc_hash, cache_dir
 
     cache_dir.mkdir(parents=True, exist_ok=True)
@@ -102,7 +119,34 @@ def _ensure_preprocess() -> Tuple[str, pathlib.Path]:
     if not geom_path.exists():
         raise RuntimeError("geometry_index.json missing after preprocess")
 
-    return doc_hash, cache_dir
+    if _reading_view_nonempty(geom_path):
+        return doc_hash, cache_dir
+
+    if not ocr_enabled:
+        # Fallback: rerun with OCR to ensure rails.
+        ocr_enabled = True
+        doc_hash = _compute_doc_hash(ocr_enabled=ocr_enabled, ade_enabled=ade_enabled)
+        cache_dir = CACHE_ROOT / doc_hash
+        geom_path = cache_dir / "geometry_index.json"
+        cmd = [
+            sys.executable,
+            str(REPO_ROOT / "scripts" / "preprocess_document.py"),
+            "--doc",
+            str(PDF_PATH),
+            "--ocr",
+            "1",
+            "--ade",
+            "0",
+        ]
+        proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
+        if proc.returncode != 0:
+            msg = proc.stderr.strip() or proc.stdout.strip() or "preprocess failed (ocr fallback)"
+            raise RuntimeError(msg)
+        if not geom_path.exists() or not _reading_view_nonempty(geom_path):
+            raise RuntimeError("Reading view is empty after OCR; check OCR output or Vision rails.")
+        return doc_hash, cache_dir
+
+    raise RuntimeError("Reading view is empty; check Phase 1 artifacts.")
 
 
 def _slugify(text: str) -> str:
