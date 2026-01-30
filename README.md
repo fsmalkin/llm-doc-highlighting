@@ -54,6 +54,7 @@ python scripts\resolve_highlight.py --doc path\to\document.pdf --doc_hash <hash>
 ## Interactive demo (local)
 
 This demo loads a fixed PDF and lets you ask a question. It runs the existing LLM span resolver and highlights the cited span in the Apryse viewer.
+Viewer UI controls are disabled; the document is read-only in the demo.
 
 Run:
 ```bash

@@ -280,9 +280,71 @@ async function initViewer() {
   );
 
   Core = viewerInstance.Core;
+  const UI = viewerInstance.UI;
   annotationManager = Core.annotationManager;
   documentViewer = Core.documentViewer;
   Annotations = Core.Annotations;
+
+  if (annotationManager?.setReadOnly) {
+    annotationManager.setReadOnly(true);
+  }
+  if (documentViewer?.setReadOnly) {
+    documentViewer.setReadOnly(true);
+  }
+
+  if (UI?.setHeaderItems) {
+    UI.setHeaderItems((header) => {
+      const items = header.getItems?.() || [];
+      for (const item of items) {
+        header.delete?.(item);
+      }
+    });
+  }
+
+  if (UI?.disableElements) {
+    try {
+      UI.disableElements([
+        "header",
+        "toolsHeader",
+        "menuButton",
+        "searchButton",
+        "leftPanel",
+        "rightPanel",
+        "searchPanel",
+        "notesPanel",
+        "outlinePanel",
+        "thumbnailsPanel",
+        "rubberStampPanel",
+        "redactionPanel",
+        "signaturePanel",
+        "stylePopup",
+        "contextMenuPopup",
+        "annotationPopup",
+        "textPopup",
+        "downloadButton",
+        "printButton",
+        "fullscreenButton",
+        "viewControlsButton",
+        "selectToolButton",
+        "panToolButton",
+        "textSelectButton",
+        "annotateButton",
+        "annotationToolsButton",
+        "zoomOverlayButton",
+        "pageNavOverlay",
+        "pageNav",
+        "pageNumberInput",
+        "fitToPageButton",
+        "fitToWidthButton",
+        "rotateClockwiseButton",
+        "rotateCounterClockwiseButton",
+        "eraserToolButton",
+        "editToolButton",
+        "formsToolButton",
+        "measureToolButton",
+      ]);
+    } catch {}
+  }
 }
 
 async function prepareCache() {

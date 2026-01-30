@@ -2,6 +2,7 @@
 
 This demo is a small local web app that loads a fixed PDF and lets you ask a question.
 It runs the existing LLM span resolver and renders highlighted results in the Apryse viewer.
+Viewer UI controls are disabled; the document is read-only in the demo.
 
 ## Requirements
 - Python 3.11+
