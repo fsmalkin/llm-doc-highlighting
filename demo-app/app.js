@@ -8,6 +8,7 @@ const sourceMetaEl = document.getElementById("sourceMeta");
 const whySummaryEl = document.getElementById("whySummary");
 const llmRequestEl = document.getElementById("llmRequest");
 const llmResponseEl = document.getElementById("llmResponse");
+const valueTypeIndicatorEl = document.getElementById("valueTypeIndicator");
 const debugEl = document.getElementById("debug");
 const questionEl = document.getElementById("question");
 const valueTypeEl = document.getElementById("valueType");
@@ -52,6 +53,17 @@ function setSource(text, meta) {
 function setWhy(text) {
   if (!whySummaryEl) return;
   whySummaryEl.textContent = text ? String(text) : "-";
+}
+
+function setValueTypeIndicator(text) {
+  if (!valueTypeIndicatorEl) return;
+  if (!text) {
+    valueTypeIndicatorEl.hidden = true;
+    valueTypeIndicatorEl.textContent = "";
+    return;
+  }
+  valueTypeIndicatorEl.hidden = false;
+  valueTypeIndicatorEl.textContent = String(text);
 }
 
 function setLlmLog(trace) {
@@ -436,6 +448,7 @@ async function askQuestion() {
   setSource("-", "-");
   setWhy("-");
   setLlmLog(null);
+  setValueTypeIndicator(null);
 
   try {
     const status = await refreshStatus();
@@ -448,6 +461,8 @@ async function askQuestion() {
     const citation = data?.citation || {};
     const pages = data?.mapped?.pages || [];
     const valueTypeResponse = data?.value_type;
+    const valueTypeRequested = String(valueTypeEl?.value || "Auto");
+    const valueTypeInferred = data?.meta?.value_type_inferred === true || valueTypeRequested === "Auto";
 
     setAnswer(answer || "(no answer)");
     const sourceText = data?.source || citation.substr || "(no citation)";
@@ -466,6 +481,11 @@ async function askQuestion() {
     setWhy(buildWhySummary(data));
     setLlmLog(data?.trace);
     setDebug(data);
+    if (valueTypeInferred && valueTypeResponse) {
+      setValueTypeIndicator(`Auto-detected type: ${valueTypeResponse}`);
+    } else {
+      setValueTypeIndicator(null);
+    }
 
     const result = renderHighlights(pages);
     if (result && documentViewer) {
@@ -516,6 +536,7 @@ setAnswer("-");
 setSource("-", "-");
 setWhy("-");
 setLlmLog(null);
+setValueTypeIndicator(null);
 setDebug(null);
 setMode("indexed");
 

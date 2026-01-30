@@ -260,6 +260,19 @@ button:disabled {
   line-height: 1.4;
 }
 
+.type-indicator {
+  margin-top: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid rgba(122, 162, 247, 0.5);
+  background: rgba(122, 162, 247, 0.12);
+  font-size: 11px;
+  color: #dbe4ff;
+}
+
 .source {
   font-size: 12px;
   line-height: 1.4;
