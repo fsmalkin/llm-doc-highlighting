@@ -23,6 +23,10 @@ UI affordances:
 - "LLM request/response" log shows the exact prompt and raw reply.
 - "Why this highlight" summarizes tokens, lines, pages, and word_id count.
 
+Optional tuning (see .env.local.example):
+- OPENAI_MODEL_PASS1 / OPENAI_MODEL_PASS2
+- RAW_PASS1_MAX_CHARS, RAW_FUZZY_ERROR_CHARS, RAW_FUZZY_ERROR_TOKENS
+
 ## Run
 
 From the repo root:
