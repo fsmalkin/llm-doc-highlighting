@@ -10,6 +10,7 @@ const llmRequestEl = document.getElementById("llmRequest");
 const llmResponseEl = document.getElementById("llmResponse");
 const debugEl = document.getElementById("debug");
 const questionEl = document.getElementById("question");
+const valueTypeEl = document.getElementById("valueType");
 const keyStatusEl = document.getElementById("keyStatus");
 const railsStatusEl = document.getElementById("railsStatus");
 const ocrStatusEl = document.getElementById("ocrStatus");
@@ -422,6 +423,7 @@ async function askQuestion() {
     setStatus("Please enter a question.", "bad");
     return;
   }
+  const valueType = String(valueTypeEl?.value || "Auto");
 
   setStatus("Running LLM resolver...", "");
   btnAsk.disabled = true;
@@ -436,16 +438,20 @@ async function askQuestion() {
       await ensurePrepared();
     }
     const endpoint = mode === "raw" ? "/api/ask_raw" : "/api/ask";
-    const data = await postJson(endpoint, { question: q });
+    const data = await postJson(endpoint, { question: q, value_type: valueType });
     const answer = data?.answer || "";
     const citation = data?.citation || {};
     const pages = data?.mapped?.pages || [];
+    const valueType = data?.value_type;
 
     setAnswer(answer || "(no answer)");
     const sourceText = data?.source || citation.substr || "(no citation)";
     const metaParts = [];
     if (citation.start_token != null && citation.end_token != null) {
       metaParts.push(`tokens ${citation.start_token}-${citation.end_token}`);
+    }
+    if (valueType) {
+      metaParts.push(`type ${valueType}`);
     }
     if (Array.isArray(pages) && pages.length) {
       const pnums = pages.map((p) => p.page).filter(Boolean);

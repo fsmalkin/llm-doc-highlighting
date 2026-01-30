@@ -66,6 +66,21 @@
             <label for="question">Question</label>
             <textarea id="question" rows="4" placeholder="Ask a question about the document..."></textarea>
           </div>
+          <div class="row">
+            <label for="valueType">Data type</label>
+            <select id="valueType">
+              <option value="Auto" selected>Auto (default)</option>
+              <option value="Date">Date</option>
+              <option value="Duration">Duration</option>
+              <option value="Name">Name</option>
+              <option value="Phone">Phone</option>
+              <option value="Email">Email</option>
+              <option value="Address">Address</option>
+              <option value="Number">Number</option>
+              <option value="Currency / Amount">Currency / Amount</option>
+              <option value="Free-text">Free-text</option>
+            </select>
+          </div>
           <div class="btns">
             <button id="btnAsk" class="primary">Ask</button>
             <button id="btnClear">Clear highlights</button>

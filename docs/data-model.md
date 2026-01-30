@@ -105,6 +105,7 @@ The span citation format ties the LLM output back to geometry deterministically.
 ```json
 {
   "answer": "short answer",
+  "value_type": "Date",
   "source": "verbatim span text",
   "citations": [
     {
@@ -134,10 +135,11 @@ Notes:
 - `start_token`/`end_token` are inclusive indices into the reading view token stream.
 - `start_text`/`end_text` are guard tokens used to validate or snap spans when the model is off by a few tokens.
 - `substr` is verbatim text for the cited span (kept for inspection/debuggability).
+- `value_type` is one of: Auto, Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount, Free-text.
 
 ## LLM resolver output artifact (`artifacts/llm_resolve/...`)
 
 The `scripts/llm_resolve_span.py` script writes an inspection JSON that includes:
-- the LLM answer and source text, plus the returned citation span
+- the LLM answer, value_type, and source text, plus the returned citation span
 - the snapped/validated span (if guard adjustment occurs)
 - the mapped `word_ids` and per-page geometry summaries

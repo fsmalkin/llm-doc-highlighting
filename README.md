@@ -56,6 +56,7 @@ python scripts\resolve_highlight.py --doc path\to\document.pdf --doc_hash <hash>
 This demo loads a fixed PDF and lets you ask a question. It runs the existing LLM span resolver and highlights the cited span in the Apryse viewer.
 Viewer UI controls are disabled; the document is read-only in the demo.
 Use the mode tabs to switch between the indexed resolver and the new raw+fuzzy two-pass approach.
+Use the data type selector to steer value-only spans (Auto will infer the type).
 
 Run:
 ```bash

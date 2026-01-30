@@ -71,7 +71,40 @@ def _is_gpt5_model(model: str) -> bool:
     return m.startswith("gpt-5")
 
 
-def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature: Optional[float]) -> str:
+VALUE_TYPES = [
+    "Auto",
+    "Date",
+    "Duration",
+    "Name",
+    "Phone",
+    "Email",
+    "Address",
+    "Number",
+    "Currency / Amount",
+    "Free-text",
+]
+
+
+def _normalize_value_type(raw: str | None) -> str:
+    if raw is None:
+        return "Auto"
+    cand = str(raw).strip()
+    if not cand:
+        return "Auto"
+    for vt in VALUE_TYPES:
+        if cand.lower() == vt.lower():
+            return vt
+    return "Auto"
+
+
+def _call_openai_tool(
+    messages: List[Dict[str, str]],
+    *,
+    model: str,
+    temperature: Optional[float],
+    tool_name: str,
+    tool_schema: Dict[str, Any],
+) -> Dict[str, Any]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("Missing OPENAI_API_KEY (set it in .env or your environment).")
@@ -80,6 +113,16 @@ def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature
     payload: Dict[str, Any] = {
         "model": model,
         "messages": messages,
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "parameters": tool_schema,
+                },
+            }
+        ],
+        "tool_choice": {"type": "function", "function": {"name": tool_name}},
     }
     if temperature is not None:
         payload["temperature"] = temperature
@@ -87,7 +130,17 @@ def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature
     resp = requests.post(url, headers=headers, json=payload, timeout=180)
     resp.raise_for_status()
     data = resp.json()
-    return str(data["choices"][0]["message"]["content"])
+    msg = (((data.get("choices") or [{}])[0] or {}).get("message") or {})
+    tool_calls = msg.get("tool_calls") if isinstance(msg, dict) else None
+    if isinstance(tool_calls, list) and tool_calls:
+        call = next((c for c in tool_calls if ((c.get("function") or {}).get("name") == tool_name)), tool_calls[0])
+        args = ((call or {}).get("function") or {}).get("arguments")
+    else:
+        fn_call = msg.get("function_call") if isinstance(msg, dict) else None
+        args = (fn_call or {}).get("arguments") if isinstance(fn_call, dict) else None
+    if not isinstance(args, str) or not args.strip():
+        raise RuntimeError("OpenAI response missing tool arguments.")
+    return json.loads(args)
 
 
 def _extract_json_obj(text: str) -> Dict[str, Any]:
@@ -250,17 +303,20 @@ def _build_window_reading_view(ctx: Dict[str, Any], start_token: int, end_token:
     return "\n".join(out_lines)
 
 
-def _build_pass1_prompt(question: str, plain_text: str) -> List[Dict[str, str]]:
+def _build_pass1_prompt(question: str, plain_text: str, value_type: str) -> List[Dict[str, str]]:
     system = "\n".join(
         [
             "You are given document text without word indexes.",
             "Return ONLY strict JSON in this shape:",
-            '{"answer":"<short answer>","raw":"<exact span to highlight>","raw_extra":"<optional surrounding context>"}',
+            '{"answer":"<short answer>","value_type":"<one of the allowed types>","raw":"<exact value only>","raw_extra":"<optional surrounding context>"}',
             "",
             "Rules:",
-            "- raw must be a verbatim span from the document text.",
+            f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
+            f'- If the requested value type is "{value_type}", follow it exactly.',
+            '- If the requested value type is "Auto", infer the best match.',
+            "- raw must be the value only (no labels) and must be a verbatim span from the document text.",
             "- raw_extra should be a larger verbatim snippet that contains raw (can be empty).",
-            "- If you cannot answer, return {\"answer\":\"\",\"raw\":\"\",\"raw_extra\":\"\"}.",
+            "- If you cannot answer, return {\"answer\":\"\",\"value_type\":\"Auto\",\"raw\":\"\",\"raw_extra\":\"\"}.",
             "- JSON only. No extra commentary.",
         ]
     )
@@ -276,7 +332,7 @@ def _build_pass1_prompt(question: str, plain_text: str) -> List[Dict[str, str]]:
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
-def _build_pass2_prompt(question: str, indexed_window: str) -> List[Dict[str, str]]:
+def _build_pass2_prompt(question: str, indexed_window: str, value_type: str) -> List[Dict[str, str]]:
     system = "\n".join(
         [
             'You are given a "reading view" where each line starts with its global_line_no (0-based) followed by a tab and the text.',
@@ -284,14 +340,17 @@ def _build_pass2_prompt(question: str, indexed_window: str) -> List[Dict[str, st
             "Cite using ONLY start_token/end_token over these token indices (inclusive). Do not cite line numbers or word ids directly.",
             "",
             "Return ONLY strict JSON in this shape:",
-            '{"answer":"<short answer>","source":"<verbatim contiguous span>","citations":[{"start_token":0,"end_token":0,"start_text":"<token>","end_text":"<token>","substr":"<verbatim contiguous span>"}]}',
+            '{"answer":"<short answer>","value_type":"<one of the allowed types>","source":"<verbatim contiguous span>","citations":[{"start_token":0,"end_token":0,"start_text":"<token>","end_text":"<token>","substr":"<verbatim contiguous span>"}]}',
             "",
             "Rules:",
+            f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
+            f'- If the requested value type is "{value_type}", follow it exactly.',
+            '- If the requested value type is "Auto", infer the best match.',
             "- Provide exactly 1 citation span when possible.",
             "- start_text/end_text must match the first/last token text in the cited span.",
             "- source must be verbatim contiguous text from the cited span (may include line wraps).",
             "- substr must be the same verbatim contiguous text from the cited span.",
-            "- If you cannot answer, return {\"answer\":\"\",\"source\":\"\",\"citations\":[]}.",
+            "- If you cannot answer, return {\"answer\":\"\",\"value_type\":\"Auto\",\"source\":\"\",\"citations\":[]}.",
             "- JSON only. No extra commentary.",
         ]
     )
@@ -305,6 +364,45 @@ def _build_pass2_prompt(question: str, indexed_window: str) -> List[Dict[str, st
         ]
     )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
+
+
+def _tool_schema_pass1() -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "value_type": {"type": "string", "enum": VALUE_TYPES},
+            "raw": {"type": "string"},
+            "raw_extra": {"type": "string"},
+        },
+        "required": ["answer", "value_type", "raw", "raw_extra"],
+    }
+
+
+def _tool_schema_pass2() -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "value_type": {"type": "string", "enum": VALUE_TYPES},
+            "source": {"type": "string"},
+            "citations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "start_token": {"type": "integer"},
+                        "end_token": {"type": "integer"},
+                        "start_text": {"type": "string"},
+                        "end_text": {"type": "string"},
+                        "substr": {"type": "string"},
+                    },
+                    "required": ["start_token", "end_token", "start_text", "end_text", "substr"],
+                },
+            },
+        },
+        "required": ["answer", "value_type", "source", "citations"],
+    }
 
 
 def _match_raw(
@@ -448,6 +546,11 @@ def main() -> None:
     ap.add_argument("--doc", required=True, help="Path to the source PDF (used for page sizes)")
     ap.add_argument("--doc_hash", required=True, help="Phase 1 cache key for this doc/config")
     ap.add_argument("--query", required=True, help="What to find/answer")
+    ap.add_argument(
+        "--value_type",
+        default="Auto",
+        help="Value type (Auto, Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount, Free-text)",
+    )
     ap.add_argument("--out", default=None, help="Optional output path")
     ap.add_argument("--trace", action="store_true", help="Include LLM request/response in output JSON")
     args = ap.parse_args()
@@ -474,19 +577,38 @@ def main() -> None:
     if len(flat_text) > max_chars:
         flat_text = flat_text[:max_chars]
 
+    value_type_req = _normalize_value_type(args.value_type)
     model_pass1 = _openai_model_pass1()
-    pass1_msgs = _build_pass1_prompt(str(args.query).strip(), flat_text)
+    pass1_msgs = _build_pass1_prompt(str(args.query).strip(), flat_text, value_type_req)
     temp1 = None if _is_gpt5_model(model_pass1) else 0
-    raw_resp = _call_openai_chat(messages=pass1_msgs, model=model_pass1, temperature=temp1)
-    pass1_obj = _extract_json_obj(raw_resp)
+    tool_name_pass1 = "return_raw_span"
+    pass1_obj = _call_openai_tool(
+        messages=pass1_msgs,
+        model=model_pass1,
+        temperature=temp1,
+        tool_name=tool_name_pass1,
+        tool_schema=_tool_schema_pass1(),
+    )
 
     answer = str(pass1_obj.get("answer") or "")
     raw = str(pass1_obj.get("raw") or "")
     raw_extra = str(pass1_obj.get("raw_extra") or "")
+    value_type_pass1 = _normalize_value_type(pass1_obj.get("value_type"))
+    value_type_inferred = value_type_req.lower() == "auto"
+    value_type_mismatch = (not value_type_inferred) and (value_type_pass1 != value_type_req)
 
     trace: Dict[str, Any] = {}
     if args.trace:
-        trace["pass1"] = {"request": {"model": model_pass1, "temperature": temp1, "messages": pass1_msgs}, "response": raw_resp}
+        trace["pass1"] = {
+            "request": {
+                "model": model_pass1,
+                "temperature": temp1,
+                "messages": pass1_msgs,
+                "tool_name": tool_name_pass1,
+                "tool_schema": _tool_schema_pass1(),
+            },
+            "response": pass1_obj,
+        }
 
     match_result, match_meta = _match_raw(flat_text=flat_text, flat_offsets=flat_offsets, raw=raw, raw_extra=raw_extra)
     used_pass2 = False
@@ -494,6 +616,7 @@ def main() -> None:
     end_token = None
     citations_obj: Optional[Dict[str, Any]] = None
     source_text = raw
+    answer_pass2 = ""
 
     if match_result is not None:
         start_token, end_token = match_result
@@ -518,10 +641,16 @@ def main() -> None:
             raise RuntimeError("Indexed window is empty for pass2.")
 
         model_pass2 = _openai_model_pass2()
-        pass2_msgs = _build_pass2_prompt(str(args.query).strip(), indexed_window)
+        pass2_msgs = _build_pass2_prompt(str(args.query).strip(), indexed_window, value_type_req)
         temp2 = None if _is_gpt5_model(model_pass2) else 0
-        raw_resp2 = _call_openai_chat(messages=pass2_msgs, model=model_pass2, temperature=temp2)
-        pass2_obj = _extract_json_obj(raw_resp2)
+        tool_name_pass2 = "return_indexed_span"
+        pass2_obj = _call_openai_tool(
+            messages=pass2_msgs,
+            model=model_pass2,
+            temperature=temp2,
+            tool_name=tool_name_pass2,
+            tool_schema=_tool_schema_pass2(),
+        )
         used_pass2 = True
 
         citations = pass2_obj.get("citations")
@@ -536,16 +665,31 @@ def main() -> None:
         end_token = int(cit["end_token"])
         citations_obj = cit
         source_text = str(pass2_obj.get("source") or cit.get("substr") or "")
+        value_type_pass2 = _normalize_value_type(pass2_obj.get("value_type"))
+        answer_pass2 = str(pass2_obj.get("answer") or "")
 
         if args.trace:
             trace["pass2"] = {
-                "request": {"model": model_pass2, "temperature": temp2, "messages": pass2_msgs},
-                "response": raw_resp2,
+                "request": {
+                    "model": model_pass2,
+                    "temperature": temp2,
+                    "messages": pass2_msgs,
+                    "tool_name": tool_name_pass2,
+                    "tool_schema": _tool_schema_pass2(),
+                },
+                "response": pass2_obj,
                 "window": {"start_token": window_start, "end_token": window_end},
             }
 
     if start_token is None or end_token is None:
         raise RuntimeError("No span resolved.")
+
+    if used_pass2:
+        value_type_final = value_type_pass2 or value_type_req
+    else:
+        value_type_final = value_type_pass1 or value_type_req
+    value_type_mismatch = (not value_type_inferred) and (value_type_final != value_type_req)
+    answer_final = answer or answer_pass2
 
     flat_word_ids: List[str] = ctx.get("flat_word_ids") or []
     words_by_id: Dict[str, Dict[str, Any]] = ctx.get("words_by_id") or {}
@@ -570,7 +714,8 @@ def main() -> None:
         "doc_id": ctx.get("doc") or pdf_path.name,
         "doc_hash": doc_hash,
         "query": str(args.query),
-        "answer": answer,
+        "answer": answer_final,
+        "value_type": value_type_final,
         "source": source_text,
         "citation": {
             "start_token": int(start_token),
@@ -597,6 +742,9 @@ def main() -> None:
             "raw_extra": raw_extra,
             "match": match_meta,
             "reading_view": ctx.get("guard_meta"),
+            "value_type_requested": value_type_req,
+            "value_type_inferred": value_type_inferred,
+            "value_type_mismatch": value_type_mismatch,
         },
     }
     if args.trace:

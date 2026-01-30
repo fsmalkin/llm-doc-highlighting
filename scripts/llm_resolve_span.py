@@ -69,6 +69,32 @@ def _is_gpt5_model(model: str) -> bool:
     return m.startswith("gpt-5")
 
 
+VALUE_TYPES = [
+    "Auto",
+    "Date",
+    "Duration",
+    "Name",
+    "Phone",
+    "Email",
+    "Address",
+    "Number",
+    "Currency / Amount",
+    "Free-text",
+]
+
+
+def _normalize_value_type(raw: str | None) -> str:
+    if raw is None:
+        return "Auto"
+    cand = str(raw).strip()
+    if not cand:
+        return "Auto"
+    for vt in VALUE_TYPES:
+        if cand.lower() == vt.lower():
+            return vt
+    return "Auto"
+
+
 def _extract_response_text(data: Dict[str, Any]) -> str:
     if isinstance(data.get("output_text"), str) and data.get("output_text"):
         return str(data["output_text"])
@@ -96,7 +122,14 @@ def _extract_response_text(data: Dict[str, Any]) -> str:
     return ""
 
 
-def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature: Optional[float]) -> str:
+def _call_openai_tool(
+    messages: List[Dict[str, str]],
+    *,
+    model: str,
+    temperature: Optional[float],
+    tool_name: str,
+    tool_schema: Dict[str, Any],
+) -> Dict[str, Any]:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("Missing OPENAI_API_KEY (set it in .env or your environment).")
@@ -105,6 +138,16 @@ def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature
     payload: Dict[str, Any] = {
         "model": model,
         "messages": messages,
+        "tools": [
+            {
+                "type": "function",
+                "function": {
+                    "name": tool_name,
+                    "parameters": tool_schema,
+                },
+            }
+        ],
+        "tool_choice": {"type": "function", "function": {"name": tool_name}},
     }
     if temperature is not None:
         payload["temperature"] = temperature
@@ -112,7 +155,17 @@ def _call_openai_chat(messages: List[Dict[str, str]], *, model: str, temperature
     resp = requests.post(url, headers=headers, json=payload, timeout=180)
     resp.raise_for_status()
     data = resp.json()
-    return str(data["choices"][0]["message"]["content"])
+    msg = (((data.get("choices") or [{}])[0] or {}).get("message") or {})
+    tool_calls = msg.get("tool_calls") if isinstance(msg, dict) else None
+    if isinstance(tool_calls, list) and tool_calls:
+        call = next((c for c in tool_calls if ((c.get("function") or {}).get("name") == tool_name)), tool_calls[0])
+        args = ((call or {}).get("function") or {}).get("arguments")
+    else:
+        fn_call = msg.get("function_call") if isinstance(msg, dict) else None
+        args = (fn_call or {}).get("arguments") if isinstance(fn_call, dict) else None
+    if not isinstance(args, str) or not args.strip():
+        raise RuntimeError("OpenAI response missing tool arguments.")
+    return json.loads(args)
 
 
 def _extract_json_obj(text: str) -> Dict[str, Any]:
@@ -183,7 +236,7 @@ def _normalize_poly(poly_abs: List[List[float]], pw: float, ph: float) -> List[L
     return [[float(x) / pw, float(y) / ph] for x, y in poly_abs]
 
 
-def _build_system_prompt() -> str:
+def _build_system_prompt(value_type: str) -> str:
     return "\n".join(
         [
             'You are given a "reading view" where each line starts with its global_line_no (0-based) followed by a tab and the text.',
@@ -191,17 +244,46 @@ def _build_system_prompt() -> str:
             "Cite using ONLY start_token/end_token over these token indices (inclusive). Do not cite line numbers or word ids directly.",
             "",
             "Return ONLY strict JSON in this shape:",
-            '{"answer":"<short answer>","source":"<verbatim contiguous span>","citations":[{"start_token":0,"end_token":0,"start_text":"<token>","end_text":"<token>","substr":"<verbatim contiguous span>"}]}',
+            '{"answer":"<short answer>","value_type":"<one of the allowed types>","source":"<verbatim contiguous span>","citations":[{"start_token":0,"end_token":0,"start_text":"<token>","end_text":"<token>","substr":"<verbatim contiguous span>"}]}',
             "",
             "Rules:",
+            f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
+            f'- If the requested value type is "{value_type}", follow it exactly.',
+            '- If the requested value type is "Auto", infer the best match.',
             "- Provide exactly 1 citation span when possible.",
             "- start_text/end_text must match the first/last token text in the cited span.",
             "- source must be verbatim contiguous text from the cited span (may include line wraps).",
             "- substr must be the same verbatim contiguous text from the cited span.",
-            "- If you cannot answer, return {\"answer\":\"\",\"source\":\"\",\"citations\":[]}.",
+            '- If you cannot answer, return {"answer":"","source":"","citations":[]}.',
             "- JSON only. No extra commentary.",
         ]
     )
+
+
+def _tool_schema_citation() -> Dict[str, Any]:
+    return {
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "value_type": {"type": "string", "enum": VALUE_TYPES},
+            "source": {"type": "string"},
+            "citations": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "start_token": {"type": "integer"},
+                        "end_token": {"type": "integer"},
+                        "start_text": {"type": "string"},
+                        "end_text": {"type": "string"},
+                        "substr": {"type": "string"},
+                    },
+                    "required": ["start_token", "end_token", "start_text", "end_text", "substr"],
+                },
+            },
+        },
+        "required": ["answer", "value_type", "source", "citations"],
+    }
 
 
 def main() -> None:
@@ -212,6 +294,11 @@ def main() -> None:
     ap.add_argument("--doc_hash", required=True, help="Phase 1 cache key for this doc/config")
     ap.add_argument("--query", required=True, help="What to find/answer; the model must cite a single span")
     ap.add_argument("--model", default=None, help="Override model (default: OPENAI_MODEL or gpt-4o-mini)")
+    ap.add_argument(
+        "--value_type",
+        default="Auto",
+        help="Value type (Auto, Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount, Free-text)",
+    )
     ap.add_argument("--out", default=None, help="Optional output path (default: artifacts/llm_resolve/<doc_hash>/<slug>.json)")
     ap.add_argument("--trace", action="store_true", help="Include LLM request/response in output JSON")
     args = ap.parse_args()
@@ -231,7 +318,8 @@ def main() -> None:
     if not reading_view_text.strip():
         raise RuntimeError("Reading view is empty; check Phase 1 artifacts.")
 
-    system_prompt = _build_system_prompt()
+    value_type_req = _normalize_value_type(args.value_type)
+    system_prompt = _build_system_prompt(value_type_req)
     user_prompt = "\n".join(
         [
             "Question:",
@@ -248,8 +336,14 @@ def main() -> None:
         {"role": "user", "content": user_prompt},
     ]
     temp = None if _is_gpt5_model(model) else 0
-    raw = _call_openai_chat(messages=messages, model=model, temperature=temp)
-    obj = _extract_json_obj(raw)
+    tool_name = "return_span_citation"
+    obj = _call_openai_tool(
+        messages=messages,
+        model=model,
+        temperature=temp,
+        tool_name=tool_name,
+        tool_schema=_tool_schema_citation(),
+    )
     trace = None
     if args.trace:
         trace = {
@@ -258,11 +352,10 @@ def main() -> None:
                 "temperature": temp,
                 "base_url": _openai_base_url(),
                 "messages": messages,
+                "tool_name": tool_name,
+                "tool_schema": _tool_schema_citation(),
             },
-            "response": {
-                "text": raw,
-                "parsed": obj,
-            },
+            "response": obj,
         }
 
     citations = obj.get("citations")
@@ -289,6 +382,9 @@ def main() -> None:
     if source_from_model and source_text.strip() != substr.strip():
         source_text = substr
         source_from_model = False
+    value_type_returned = _normalize_value_type(obj.get("value_type"))
+    value_type_inferred = value_type_req.lower() == "auto"
+    value_type_mismatch = (not value_type_inferred) and (value_type_returned != value_type_req)
 
     adjusted = rv.adjust_span_using_guards(
         start_token=start_token,
@@ -353,6 +449,7 @@ def main() -> None:
         "doc_hash": doc_hash,
         "query": str(args.query),
         "answer": str(obj.get("answer") or ""),
+        "value_type": value_type_returned or value_type_req,
         "source": source_text,
         "citation": {
             "start_token": start_token,
@@ -376,6 +473,9 @@ def main() -> None:
             "reading_view": ctx.get("guard_meta"),
             "reading_view_preview": ctx.get("reading_view_preview"),
             "source_from_model": source_from_model,
+            "value_type_requested": value_type_req,
+            "value_type_inferred": value_type_inferred,
+            "value_type_mismatch": value_type_mismatch,
         },
     }
     if trace is not None:

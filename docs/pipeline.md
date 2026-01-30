@@ -44,6 +44,7 @@ LLM-first (token-indexed reading view):
   - `start_token` / `end_token` (inclusive), plus
   - `start_text` / `end_text` guard tokens, plus
   - `substr` (verbatim span text).
+- Tool-calling JSON is enforced for structured outputs.
 - We validate and (optionally) snap spans using guard tokens, then map spans -> `word_ids` -> geometry.
 
 Deterministic fallback:

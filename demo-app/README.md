@@ -20,6 +20,7 @@ If the reading view is empty, the demo server will retry preprocessing with OCR 
 UI affordances:
 - A System status chip summarizes readiness; expand for key, rails, OCR, cache, and model.
 - Mode tabs: "Indexed" uses the direct token-indexed resolver. "Raw + Fuzzy" uses the two-pass raw/raw_extra approach.
+- Data type selector steers the LLM to return value-only spans (Auto will infer the best type).
 - "LLM request/response" log shows the exact prompt and raw reply.
 - "Why this highlight" summarizes tokens, lines, pages, and word_id count.
 

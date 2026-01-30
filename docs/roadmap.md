@@ -18,6 +18,7 @@ Deliverables
     - Fuzzy match raw/raw_extra against the document text
     - If no unique exact match, send a narrowed indexed window to a cheap LLM for start/end tokens
   - renders highlights in the Apryse viewer and shows answer + source snippet
+  - allows selecting a data type (or Auto) and uses tool-calling JSON for value-only spans
 - Transparency in the demo UI:
   - show the LLM request and raw response payloads (pass1/pass2 for raw mode)
   - show a "why this highlight" summary (token range, lines, pages, word_id count)
