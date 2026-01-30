@@ -395,7 +395,7 @@ async function askQuestion() {
     const pages = data?.mapped?.pages || [];
 
     setAnswer(answer || "(no answer)");
-    const sourceText = citation.substr || "(no citation)";
+    const sourceText = data?.source || citation.substr || "(no citation)";
     const metaParts = [];
     if (citation.start_token != null && citation.end_token != null) {
       metaParts.push(`tokens ${citation.start_token}-${citation.end_token}`);

@@ -333,6 +333,7 @@ class DemoHandler(SimpleHTTPRequestHandler):
             "doc_hash": data.get("doc_hash"),
             "query": data.get("query"),
             "answer": data.get("answer"),
+            "source": data.get("source"),
             "citation": data.get("citation"),
             "span": data.get("span"),
             "mapped": data.get("mapped"),

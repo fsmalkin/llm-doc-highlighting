@@ -100,7 +100,25 @@ Properties:
 
 ## Span citation schema (LLM output)
 
-The span citation format ties the LLM output back to geometry deterministically:
+The span citation format ties the LLM output back to geometry deterministically. The LLM returns:
+
+```json
+{
+  "answer": "short answer",
+  "source": "verbatim span text",
+  "citations": [
+    {
+      "start_token": 120,
+      "end_token": 121,
+      "start_text": "Jane",
+      "end_text": "Smith",
+      "substr": "Jane Smith"
+    }
+  ]
+}
+```
+
+Citation object shape:
 
 ```json
 {
@@ -120,6 +138,6 @@ Notes:
 ## LLM resolver output artifact (`artifacts/llm_resolve/...`)
 
 The `scripts/llm_resolve_span.py` script writes an inspection JSON that includes:
-- the LLM answer (optional) and the returned citation span
+- the LLM answer and source text, plus the returned citation span
 - the snapped/validated span (if guard adjustment occurs)
 - the mapped `word_ids` and per-page geometry summaries

@@ -191,13 +191,14 @@ def _build_system_prompt() -> str:
             "Cite using ONLY start_token/end_token over these token indices (inclusive). Do not cite line numbers or word ids directly.",
             "",
             "Return ONLY strict JSON in this shape:",
-            '{"answer":"<short answer>","citations":[{"start_token":0,"end_token":0,"start_text":"<token>","end_text":"<token>","substr":"<verbatim contiguous span>"}]}',
+            '{"answer":"<short answer>","source":"<verbatim contiguous span>","citations":[{"start_token":0,"end_token":0,"start_text":"<token>","end_text":"<token>","substr":"<verbatim contiguous span>"}]}',
             "",
             "Rules:",
             "- Provide exactly 1 citation span when possible.",
             "- start_text/end_text must match the first/last token text in the cited span.",
-            "- substr must be verbatim contiguous text from the cited span (may include line wraps).",
-            "- If you cannot answer, return {\"answer\":\"\",\"citations\":[]}.",
+            "- source must be verbatim contiguous text from the cited span (may include line wraps).",
+            "- substr must be the same verbatim contiguous text from the cited span.",
+            "- If you cannot answer, return {\"answer\":\"\",\"source\":\"\",\"citations\":[]}.",
             "- JSON only. No extra commentary.",
         ]
     )
@@ -282,6 +283,12 @@ def main() -> None:
     start_text = cit.get("start_text")
     end_text = cit.get("end_text")
     substr = str(cit.get("substr") or "")
+    source_raw = str(obj.get("source") or "")
+    source_text = source_raw.strip() or substr
+    source_from_model = bool(source_raw.strip())
+    if source_from_model and source_text.strip() != substr.strip():
+        source_text = substr
+        source_from_model = False
 
     adjusted = rv.adjust_span_using_guards(
         start_token=start_token,
@@ -346,6 +353,7 @@ def main() -> None:
         "doc_hash": doc_hash,
         "query": str(args.query),
         "answer": str(obj.get("answer") or ""),
+        "source": source_text,
         "citation": {
             "start_token": start_token,
             "end_token": end_token,
@@ -367,6 +375,7 @@ def main() -> None:
             "model": model,
             "reading_view": ctx.get("guard_meta"),
             "reading_view_preview": ctx.get("reading_view_preview"),
+            "source_from_model": source_from_model,
         },
     }
     if trace is not None:

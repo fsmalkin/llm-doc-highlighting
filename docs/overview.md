@@ -21,7 +21,8 @@ The design is intentionally preprocessing-first: expensive or fragile steps (par
 4. LLM-indexed reading view
    - Renders the geometry index into a line-aware reading view with stable global token indices.
 5. Span citation mapping
-   - The LLM returns citations as `{ start_token, end_token, start_text, end_text, substr }`.
+   - The LLM returns a short answer plus a cited source span.
+   - Citations are `{ start_token, end_token, start_text, end_text, substr }`.
    - We validate and (optionally) snap spans using the guard tokens, then map spans -> `word_ids` -> geometry.
 6. Deterministic fallback
    - When the LLM is unavailable or span validation fails, a simple deterministic matcher can still resolve some citations.

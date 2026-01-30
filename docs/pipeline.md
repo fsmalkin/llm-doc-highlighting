@@ -40,7 +40,7 @@ Outputs:
 LLM-first (token-indexed reading view):
 - Build a full-document, line-aware reading view from `geometry_index.json`.
 - Every word token is annotated with a stable global token index: `[<token_idx>:<word_id>]TokenText`.
-- The LLM returns citations as a single contiguous span using:
+- The LLM returns a short answer plus a source snippet, along with a single contiguous citation span using:
   - `start_token` / `end_token` (inclusive), plus
   - `start_text` / `end_text` guard tokens, plus
   - `substr` (verbatim span text).
