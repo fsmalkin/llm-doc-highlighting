@@ -7,6 +7,13 @@ const sourceTextEl = document.getElementById("sourceText");
 const sourceMetaEl = document.getElementById("sourceMeta");
 const debugEl = document.getElementById("debug");
 const questionEl = document.getElementById("question");
+const keyStatusEl = document.getElementById("keyStatus");
+const railsStatusEl = document.getElementById("railsStatus");
+const ocrStatusEl = document.getElementById("ocrStatus");
+const cacheStatusEl = document.getElementById("cacheStatus");
+const modelStatusEl = document.getElementById("modelStatus");
+const toggleOcrEl = document.getElementById("toggleOcr");
+const toggleAutoPrepareEl = document.getElementById("toggleAutoPrepare");
 
 const btnPrepare = document.getElementById("btnPrepare");
 const btnAsk = document.getElementById("btnAsk");
@@ -36,6 +43,23 @@ function setDebug(obj) {
   debugEl.textContent = obj ? JSON.stringify(obj, null, 2) : "";
 }
 
+function setBadge(el, text, kind) {
+  if (!el) return;
+  el.textContent = text || "-";
+  el.classList.remove("good", "bad", "warn");
+  if (kind) el.classList.add(kind);
+}
+
+async function getJson(url) {
+  const res = await fetch(url, { method: "GET" });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) {
+    const msg = data.error || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
 async function postJson(url, body) {
   const res = await fetch(url, {
     method: "POST",
@@ -48,6 +72,47 @@ async function postJson(url, body) {
     throw new Error(msg);
   }
   return data;
+}
+
+function normalizeBool(value) {
+  return value === true || value === "1" || value === 1;
+}
+
+async function refreshStatus() {
+  try {
+    const ocrParam = toggleOcrEl?.checked ? "1" : "0";
+    const data = await getJson(`/api/status?ocr=${ocrParam}`);
+    const keyPresent = normalizeBool(data?.openai_key_present);
+    setBadge(keyStatusEl, keyPresent ? "present" : "missing", keyPresent ? "good" : "bad");
+
+    const railsRequired = normalizeBool(data?.rails_required);
+    const railsOk = normalizeBool(data?.rails_ok);
+    setBadge(
+      railsStatusEl,
+      railsOk ? (railsRequired ? "required ok" : "ok") : railsRequired ? "required" : "optional",
+      railsOk ? "good" : railsRequired ? "bad" : "warn"
+    );
+
+    const ocrEnabled = normalizeBool(data?.ocr_enabled);
+    setBadge(ocrStatusEl, ocrEnabled ? "enabled" : "off", ocrEnabled ? "good" : "warn");
+
+    const cacheReady = normalizeBool(data?.cache_ready);
+    setBadge(cacheStatusEl, cacheReady ? "ready" : "missing", cacheReady ? "good" : "warn");
+
+    const model = data?.model || "-";
+    setBadge(modelStatusEl, model, "good");
+
+    setDebug(data);
+    return data;
+  } catch (err) {
+    setBadge(keyStatusEl, "unknown", "warn");
+    setBadge(railsStatusEl, "unknown", "warn");
+    setBadge(ocrStatusEl, "unknown", "warn");
+    setBadge(cacheStatusEl, "unknown", "warn");
+    setBadge(modelStatusEl, "unknown", "warn");
+    setDebug({ error: err.message });
+    return null;
+  }
 }
 
 function quadToApryseQuad(CoreObj, q) {
@@ -127,9 +192,10 @@ async function prepareCache() {
   setStatus("Preparing cache...", "");
   btnPrepare.disabled = true;
   try {
-    const data = await postJson("/api/preprocess", {});
+    const data = await postJson("/api/preprocess", { ocr: toggleOcrEl?.checked ? 1 : 0 });
     setStatus(`Cache ready. doc_hash=${data.doc_hash}`, "ok");
     setDebug(data);
+    await refreshStatus();
   } catch (err) {
     setStatus(`Preprocess failed: ${err.message}`, "bad");
   } finally {
@@ -150,7 +216,16 @@ async function askQuestion() {
   setSource("-", "-");
 
   try {
-    const data = await postJson("/api/ask", { question: q });
+    if (toggleAutoPrepareEl?.checked) {
+      const status = await refreshStatus();
+      if (!status?.cache_ready) {
+        await prepareCache();
+      }
+    }
+    const data = await postJson("/api/ask", {
+      question: q,
+      ocr: toggleOcrEl?.checked ? 1 : 0,
+    });
     const answer = data?.answer || "";
     const citation = data?.citation || {};
     const pages = data?.mapped?.pages || [];
@@ -184,8 +259,10 @@ async function askQuestion() {
     }
 
     setStatus("Done.", "ok");
+    await refreshStatus();
   } catch (err) {
     setStatus(`Ask failed: ${err.message}`, "bad");
+    await refreshStatus();
   } finally {
     btnAsk.disabled = false;
   }
@@ -197,6 +274,7 @@ btnClear.addEventListener("click", () => {
   clearHighlights();
   setStatus("Cleared highlights.", "ok");
 });
+toggleOcrEl?.addEventListener("change", () => refreshStatus());
 
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");
@@ -206,3 +284,5 @@ setDebug(null);
 initViewer()
   .then(() => setStatus("Viewer ready.", "ok"))
   .catch((err) => setStatus(`Viewer failed: ${err.message}`, "bad"));
+
+refreshStatus();

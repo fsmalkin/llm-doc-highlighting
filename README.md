@@ -71,8 +71,9 @@ demo-app\assets\Physician_Report_Scanned.pdf
 ```
 
 Walkthrough:
-1) Click "Prepare cache" to build Geometry Index (rails).
-2) Enter a question and click "Ask".
+1) Check the Quick Start badges (key, rails, cache, model).
+2) Click "Prepare cache" (or leave Auto-prepare on and just click Ask).
+3) Enter a question and click "Ask".
 3) The answer and source snippet appear; highlights render in the viewer.
 
 Example question:

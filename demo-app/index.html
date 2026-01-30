@@ -23,9 +23,48 @@
         </div>
 
         <div class="card">
+          <div class="label">Quick start</div>
+          <div class="checklist">
+            <div class="check-item">
+              <span class="check-label">Key detected</span>
+              <span id="keyStatus" class="badge">...</span>
+            </div>
+            <div class="check-item">
+              <span class="check-label">Rails</span>
+              <span id="railsStatus" class="badge">...</span>
+            </div>
+            <div class="check-item">
+              <span class="check-label">OCR</span>
+              <span id="ocrStatus" class="badge">...</span>
+            </div>
+            <div class="check-item">
+              <span class="check-label">Cache</span>
+              <span id="cacheStatus" class="badge">...</span>
+            </div>
+            <div class="check-item">
+              <span class="check-label">Model</span>
+              <span id="modelStatus" class="badge">...</span>
+            </div>
+          </div>
+          <p class="muted">
+            If a badge says "missing", set the value in <span class="mono">.env</span> and reload.
+          </p>
+        </div>
+
+        <div class="card">
           <div class="row">
             <label for="question">Question</label>
             <textarea id="question" rows="4" placeholder="Ask a question about the document..."></textarea>
+          </div>
+          <div class="toggles">
+            <label class="toggle">
+              <input id="toggleOcr" type="checkbox" checked />
+              <span>Force OCR rails (recommended)</span>
+            </label>
+            <label class="toggle">
+              <input id="toggleAutoPrepare" type="checkbox" checked />
+              <span>Auto-prepare cache before Ask</span>
+            </label>
           </div>
           <div class="btns">
             <button id="btnPrepare">Prepare cache</button>

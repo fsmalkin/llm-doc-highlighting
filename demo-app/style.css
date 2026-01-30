@@ -71,6 +71,55 @@ body {
   border-radius: 10px;
 }
 
+.checklist {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.check-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+
+.check-label {
+  color: var(--muted);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 70px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.badge.good {
+  color: var(--good);
+  border-color: rgba(126, 231, 135, 0.4);
+  background: rgba(126, 231, 135, 0.1);
+}
+
+.badge.bad {
+  color: var(--bad);
+  border-color: rgba(255, 123, 114, 0.35);
+  background: rgba(255, 123, 114, 0.08);
+}
+
+.badge.warn {
+  color: #f9e2af;
+  border-color: rgba(249, 226, 175, 0.35);
+  background: rgba(249, 226, 175, 0.08);
+}
+
 .label {
   font-size: 12px;
   color: var(--muted);
@@ -101,6 +150,24 @@ textarea {
 textarea:focus {
   border-color: rgba(122, 162, 247, 0.8);
   box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
+}
+
+.toggles {
+  display: grid;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.toggle input {
+  accent-color: var(--accent);
 }
 
 .btns {

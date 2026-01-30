@@ -16,6 +16,11 @@ Rails policy:
 - Otherwise, use the PDF text layer or enable OCR fallback (OCR_ENABLED=1).
 If the reading view is empty, the demo server will retry preprocessing with OCR enabled.
 
+UI affordances:
+- A Quick Start checklist shows whether the key, rails, OCR, cache, and model are detected.
+- Toggle "Force OCR rails" to prefer OCR for preprocessing.
+- "Auto-prepare" makes the Ask button prepare cache if needed.
+
 ## Run
 
 From the repo root:
@@ -27,8 +32,9 @@ Then open:
   http://127.0.0.1:8000/
 
 Walkthrough:
-1) Click "Prepare cache" to build Geometry Index (rails).
-2) Enter a question and click "Ask".
+1) Confirm the Quick Start checklist shows your key and rails.
+2) Click "Prepare cache" (or leave Auto-prepare on and just click Ask).
+3) Enter a question and click "Ask".
 3) The answer and source snippet appear; highlights render in the viewer.
 
 Example question:

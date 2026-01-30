@@ -87,11 +87,14 @@ def _reading_view_nonempty(geom_path: pathlib.Path) -> bool:
         return False
 
 
-def _ensure_preprocess() -> Tuple[str, pathlib.Path]:
+def _ensure_preprocess(*, prefer_ocr: bool | None = None) -> Tuple[str, pathlib.Path]:
     if not PDF_PATH.exists():
         raise FileNotFoundError(f"Missing PDF: {PDF_PATH}")
 
-    ocr_enabled = _read_env_flag("PREPROCESS_OCR") or _read_env_flag("OCR_ENABLED")
+    if prefer_ocr is None:
+        ocr_enabled = _read_env_flag("PREPROCESS_OCR") or _read_env_flag("OCR_ENABLED")
+    else:
+        ocr_enabled = prefer_ocr
     ade_enabled = False
     doc_hash = _compute_doc_hash(ocr_enabled=ocr_enabled, ade_enabled=ade_enabled)
     cache_dir = CACHE_ROOT / doc_hash
@@ -107,7 +110,7 @@ def _ensure_preprocess() -> Tuple[str, pathlib.Path]:
         "--doc",
         str(PDF_PATH),
         "--ocr",
-        "0",
+        "1" if ocr_enabled else "0",
         "--ade",
         "0",
     ]
@@ -154,8 +157,8 @@ def _slugify(text: str) -> str:
     return clean[:64] or "query"
 
 
-def _run_llm(question: str) -> Dict[str, Any]:
-    doc_hash, _cache_dir = _ensure_preprocess()
+def _run_llm(question: str, *, prefer_ocr: bool | None = None) -> Dict[str, Any]:
+    doc_hash, _cache_dir = _ensure_preprocess(prefer_ocr=prefer_ocr)
 
     model = os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
     out_dir = ARTIFACTS_ROOT / doc_hash
@@ -189,6 +192,9 @@ def _run_llm(question: str) -> Dict[str, Any]:
 
 class DemoHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
+        if self.path == "/api/status":
+            self._handle_status()
+            return
         if self.path.startswith("/api/"):
             self._send_json({"ok": False, "error": "Use POST"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
             return
@@ -240,7 +246,11 @@ class DemoHandler(SimpleHTTPRequestHandler):
 
     def _handle_preprocess(self) -> None:
         try:
-            doc_hash, cache_dir = _ensure_preprocess()
+            body = self._read_json()
+            prefer_ocr = None
+            if "ocr" in body:
+                prefer_ocr = str(body.get("ocr", "0")).strip() == "1"
+            doc_hash, cache_dir = _ensure_preprocess(prefer_ocr=prefer_ocr)
             self._send_json(
                 {
                     "ok": True,
@@ -252,14 +262,55 @@ class DemoHandler(SimpleHTTPRequestHandler):
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
+    def _handle_status(self) -> None:
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query or "")
+            prefer_ocr = None
+            if "ocr" in params:
+                prefer_ocr = params.get("ocr", ["0"])[0].strip() == "1"
+            rails_required = _read_env_flag("RAILS_REQUIRED", "1")
+            ocr_env_enabled = _read_env_flag("PREPROCESS_OCR") or _read_env_flag("OCR_ENABLED")
+            if prefer_ocr is None:
+                prefer_ocr = ocr_env_enabled
+            doc_hash = _compute_doc_hash(ocr_enabled=prefer_ocr, ade_enabled=False)
+            cache_dir = CACHE_ROOT / doc_hash
+            geom_path = cache_dir / "geometry_index.json"
+            rails_ok = bool(geom_path.exists() and _reading_view_nonempty(geom_path))
+
+            key_present = bool(os.getenv("OPENAI_API_KEY"))
+            model = os.getenv("OPENAI_MODEL") or DEFAULT_MODEL
+            creds_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS") or ""
+            creds_present = bool(creds_path and pathlib.Path(creds_path).exists())
+
+            self._send_json(
+                {
+                    "ok": True,
+                    "openai_key_present": key_present,
+                    "model": model,
+                    "ocr_enabled": prefer_ocr,
+                    "rails_required": rails_required,
+                    "rails_ok": rails_ok,
+                    "cache_ready": bool(cache_dir.exists() and geom_path.exists()),
+                    "doc_hash": doc_hash,
+                    "doc": str(PDF_PATH),
+                    "vision_credentials_present": creds_present,
+                }
+            )
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
     def _handle_ask(self) -> None:
         body = self._read_json()
         question = str(body.get("question") or "").strip()
         if not question:
             self._send_json({"ok": False, "error": "Missing question"}, status=HTTPStatus.BAD_REQUEST)
             return
+        prefer_ocr = None
+        if "ocr" in body:
+            prefer_ocr = str(body.get("ocr", "0")).strip() == "1"
         try:
-            data = _run_llm(question)
+            data = _run_llm(question, prefer_ocr=prefer_ocr)
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
             return
