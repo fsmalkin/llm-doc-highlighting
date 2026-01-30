@@ -160,7 +160,7 @@ textarea:focus {
 
 .toggle {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   font-size: 12px;
   color: var(--muted);
@@ -168,6 +168,13 @@ textarea:focus {
 
 .toggle input {
   accent-color: var(--accent);
+}
+
+.toggle-help {
+  display: block;
+  margin-top: 4px;
+  font-style: normal;
+  color: #c4cad6;
 }
 
 .btns {
