@@ -13,7 +13,14 @@ python -m pip install -r requirements-ocr.txt
 
 ## 2) Configure (optional)
 
-Create `.env` and copy any needed keys from your local environment (see `.env.example`).
+Create `.env` for secrets (from `.env.example`) and `.env.local` for non-secret config (from `.env.local.example`).
+
+Rails policy:
+- Rails are required for highlights; Geometry Index is always built.
+- Vision rails are preferred when credentials are present:
+  - Set `GOOGLE_APPLICATION_CREDENTIALS` to your service account JSON.
+- If Vision is unavailable, enable OCR fallback with `OCR_ENABLED=1` (Tesseract).
+- Set `RAILS_REQUIRED=0` in `.env.local` to bypass the rails requirement (not recommended).
 
 ## 3) Preprocess a PDF
 
@@ -45,3 +52,26 @@ The deterministic resolver writes an inspection JSON under `artifacts/resolve/<d
 ## 5) Inspect logs
 
 Structured logs are written to `logs/highlights/YYYYMMDD/run-*.jsonl`.
+
+## 6) Local interactive demo
+
+The demo runs a local web app that asks a question against a fixed PDF and renders highlights in the Apryse viewer.
+
+Prereq:
+- `OPENAI_API_KEY` set in `.env` or your environment
+- Default model is `gpt-5-mini` (override with `OPENAI_MODEL`)
+
+Run:
+```bash
+python scripts\demo_server.py
+```
+
+Open:
+```
+http://127.0.0.1:8000/
+```
+
+Fixed document:
+```
+demo-app\assets\Physician_Report_Scanned.pdf
+```

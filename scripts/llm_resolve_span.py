@@ -35,21 +35,24 @@ except Exception:
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def _load_env_from_dotenv(dotenv_path: pathlib.Path) -> None:
-    try:
-        if not dotenv_path.exists():
-            return
-        for raw in dotenv_path.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
+def _load_env_from_dotenv(dotenv_paths: list[pathlib.Path]) -> None:
+    for p in dotenv_paths:
+        try:
+            if not p.exists():
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k:
-                os.environ[k] = v
-    except Exception:
-        return
+            for raw in p.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k:
+                    existing = os.environ.get(k)
+                    if existing is None or existing == "":
+                        os.environ[k] = v
+        except Exception:
+            continue
 
 
 def _openai_base_url() -> str:
@@ -168,7 +171,7 @@ def _build_system_prompt() -> str:
 
 
 def main() -> None:
-    _load_env_from_dotenv(REPO_ROOT / ".env")
+    _load_env_from_dotenv([REPO_ROOT / ".env.local", REPO_ROOT / ".env"])
 
     ap = argparse.ArgumentParser(description="LLM span resolver over a token-indexed reading view")
     ap.add_argument("--doc", required=True, help="Path to the source PDF (used for page sizes)")
@@ -333,4 +336,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

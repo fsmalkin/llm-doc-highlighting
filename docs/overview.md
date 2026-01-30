@@ -15,6 +15,7 @@ The design is intentionally preprocessing-first: expensive or fragile steps (par
 2. Fine geometry
    - Extracts word/line bounding boxes from the PDF text layer.
    - Optionally falls back to OCR when the text layer is missing or insufficient.
+   - Vision rails are preferred when credentials are present.
 3. Geometry index
    - Rearranges per-chunk geometry into a page-centric structure with stable `word_id`s and reading order.
 4. LLM-indexed reading view
@@ -31,3 +32,4 @@ The design is intentionally preprocessing-first: expensive or fragile steps (par
 - `docs/` - narrative + reference documentation
 - `cache/` - generated artifacts keyed by `doc_hash` (not tracked)
 - `logs/` - structured JSONL logs (not tracked)
+- `demo-app/` - local interactive demo (fixed PDF + question input + Apryse viewer)

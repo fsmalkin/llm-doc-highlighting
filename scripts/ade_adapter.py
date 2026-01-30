@@ -76,31 +76,33 @@ def _bbox_from_any(obj: Any) -> Optional[Tuple[float, float, float, float]]:
 DEFAULT_ADE_BASE_URL = "https://api.va.landing.ai"  # can be overridden via env ADE_BASE_URL
 
 
-def _load_env_from_dotenv(dotenv_path: str = ".env") -> None:
+def _load_env_from_dotenv(dotenv_paths: list[pathlib.Path]) -> None:
     """
-    Minimal .env loader (no external deps). Sets/overrides os.environ[KEY] from .env.
+    Minimal .env loader (no external deps). Sets os.environ[KEY] from .env files.
     Lines: KEY=VALUE; ignores blanks and lines starting with '#'.
     """
-    try:
-        p = pathlib.Path(dotenv_path)
-        if not p.exists():
-            return
-        for raw in p.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
+    for p in dotenv_paths:
+        try:
+            if not p.exists():
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k:
-                os.environ[k] = v
-    except Exception:
-        # Silent best-effort
-        return
+            for raw in p.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k:
+                    existing = os.environ.get(k)
+                    if existing is None or existing == "":
+                        os.environ[k] = v
+        except Exception:
+            # Silent best-effort
+            continue
 
 
 def _resolve_api_config() -> Tuple[str, Optional[str], Optional[str], Optional[str]]:
-    _load_env_from_dotenv()
+    _load_env_from_dotenv([pathlib.Path(".env.local"), pathlib.Path(".env")])
     base_url = os.getenv("ADE_BASE_URL", DEFAULT_ADE_BASE_URL)
     api_key = os.getenv("LANDINGAI_API_KEY")
     ade_model = os.getenv("ADE_MODEL")  # optional

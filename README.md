@@ -28,7 +28,13 @@ python -m pip install -r requirements-ocr.txt
 ```
 
 Environment:
-- Create `.env` (git-ignored) and copy keys as needed (see `.env.example`).
+- Create `.env` (git-ignored) for secrets from `.env.example`.
+- Create `.env.local` (git-ignored) for non-secret config from `.env.local.example`.
+  - For the demo and LLM resolver, set `OPENAI_API_KEY` in `.env`.
+  - Set `OPENAI_MODEL` in `.env.local` (demo default is `gpt-5-mini`).
+  - Rails are always required. If available, Vision rails are preferred:
+    - Set `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to your service account JSON.
+    - If Vision is unavailable, enable OCR fallback with `OCR_ENABLED=1` in `.env.local` (Tesseract).
 
 Run Phase 1 preprocessing:
 ```bash
@@ -44,6 +50,30 @@ Resolve deterministically (Phase 2, fallback):
 ```bash
 python scripts\resolve_highlight.py --doc path\to\document.pdf --doc_hash <hash> --citation "exact phrase"
 ```
+
+## Interactive demo (local)
+
+This demo loads a fixed PDF and lets you ask a question. It runs the existing LLM span resolver and highlights the cited span in the Apryse viewer.
+
+Run:
+```bash
+python scripts\demo_server.py
+```
+
+Then open:
+```
+http://127.0.0.1:8000/
+```
+
+Fixed document:
+```
+demo-app\assets\Physician_Report_Scanned.pdf
+```
+
+Walkthrough:
+1) Click "Prepare cache" to build Geometry Index (rails).
+2) Enter a question and click "Ask".
+3) The answer and source snippet appear; highlights render in the viewer.
 
 ## Docs
 

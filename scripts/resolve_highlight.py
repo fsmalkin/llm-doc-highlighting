@@ -29,22 +29,24 @@ except Exception:
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def _load_env_from_dotenv(dotenv_path: str = ".env") -> None:
-    try:
-        p = pathlib.Path(dotenv_path)
-        if not p.exists():
-            return
-        for raw in p.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
+def _load_env_from_dotenv(dotenv_paths: list[pathlib.Path]) -> None:
+    for p in dotenv_paths:
+        try:
+            if not p.exists():
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k:
-                os.environ[k] = v
-    except Exception:
-        return
+            for raw in p.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k:
+                    existing = os.environ.get(k)
+                    if existing is None or existing == "":
+                        os.environ[k] = v
+        except Exception:
+            continue
 
 
 def _load_json(path: pathlib.Path) -> Any:
@@ -185,7 +187,7 @@ def _contiguous_match_window(line_word_ids: List[str], word_map: Dict[str, Dict[
 
 
 def main() -> None:
-    _load_env_from_dotenv(str(REPO_ROOT / ".env"))
+    _load_env_from_dotenv([REPO_ROOT / ".env.local", REPO_ROOT / ".env"])
 
     ap = argparse.ArgumentParser(description="Phase 2 resolver (deterministic fallback)")
     ap.add_argument("--doc", required=True, help="Path to the source PDF (used for page sizes)")

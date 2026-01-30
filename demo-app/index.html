@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Doc Highlighting Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <aside class="panel">
+        <div class="panel-header">
+          <div class="kicker">Interactive demo</div>
+          <h1>Ask + Highlight</h1>
+          <p class="muted">
+            Fixed document:
+            <span class="mono">Physician_Report_Scanned.pdf</span>
+          </p>
+          <p class="muted">
+            Bring your own key: set <span class="mono">OPENAI_API_KEY</span> in a local <span class="mono">.env</span>
+            or your environment. Default model: <span class="mono">gpt-5-mini</span>.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="row">
+            <label for="question">Question</label>
+            <textarea id="question" rows="4" placeholder="Ask a question about the document..."></textarea>
+          </div>
+          <div class="btns">
+            <button id="btnPrepare">Prepare cache</button>
+            <button id="btnAsk" class="primary">Ask</button>
+            <button id="btnClear">Clear highlights</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Status</div>
+          <div id="status" class="status">Idle</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Answer</div>
+          <div id="answer" class="answer">-</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Source</div>
+          <div id="sourceText" class="source">-</div>
+          <div id="sourceMeta" class="source-meta">-</div>
+        </div>
+
+        <div class="card">
+          <details>
+            <summary>Debug</summary>
+            <pre id="debug" class="debug"></pre>
+          </details>
+        </div>
+      </aside>
+
+      <main class="viewer">
+        <div id="wv"></div>
+      </main>
+    </div>
+
+    <script src="/webviewer/webviewer.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -33,22 +33,24 @@ import sentence_indexer
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 
-def _load_env_from_dotenv(dotenv_path: str = ".env") -> None:
-    try:
-        p = pathlib.Path(dotenv_path)
-        if not p.exists():
-            return
-        for raw in p.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
+def _load_env_from_dotenv(dotenv_paths: list[pathlib.Path]) -> None:
+    for p in dotenv_paths:
+        try:
+            if not p.exists():
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k:
-                os.environ[k] = v
-    except Exception:
-        return
+            for raw in p.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k:
+                    existing = os.environ.get(k)
+                    if existing is None or existing == "":
+                        os.environ[k] = v
+        except Exception:
+            continue
 
 
 def _today_dir(base: pathlib.Path) -> pathlib.Path:
@@ -184,7 +186,7 @@ def _synthesize_chunks_without_provider(src_path: pathlib.Path) -> list[dict[str
 
 
 def main() -> None:
-    _load_env_from_dotenv(str(REPO_ROOT / ".env"))
+    _load_env_from_dotenv([REPO_ROOT / ".env.local", REPO_ROOT / ".env"])
 
     ap = argparse.ArgumentParser(description="Phase 1 preprocessing (chunks + fine geometry + sentences + derived geometry index)")
     ap.add_argument("--doc", required=True, help="Path to source document (PDF)")
@@ -252,6 +254,22 @@ def main() -> None:
     except Exception as e:
         logger("geometry_index", {"reason": "geometry_index_failed", "meta": {"error": str(e)}})
         raise
+
+    # Rails required: ensure we produced word geometry.
+    if os.getenv("RAILS_REQUIRED", "1") != "0":
+        pages = geom.get("pages") if isinstance(geom, dict) else None
+        word_count = 0
+        if isinstance(pages, list):
+            for pg in pages:
+                words = pg.get("words") if isinstance(pg, dict) else None
+                if isinstance(words, list):
+                    word_count += len(words)
+        if word_count == 0:
+            logger("geometry_index", {"reason": "rails_missing", "meta": {"error": "no_words"}})
+            raise RuntimeError(
+                "No word geometry found. Set GOOGLE_APPLICATION_CREDENTIALS for Vision rails, "
+                "or enable OCR (OCR_ENABLED=1 / --ocr 1) and rerun."
+            )
 
     logger("summary", {"decision": "done", "confidence": 1.0, "validator_passed": True, "meta": {"cache": str(cache_dir).replace("\\", "/")}})
 

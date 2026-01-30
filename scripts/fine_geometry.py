@@ -84,22 +84,24 @@ if pytesseract is not None:
         pass
 
 
-def _load_env_from_dotenv(dotenv_path: str = ".env") -> None:
-    try:
-        p = pathlib.Path(dotenv_path)
-        if not p.exists():
-            return
-        for raw in p.read_text(encoding="utf-8").splitlines():
-            line = raw.strip()
-            if not line or line.startswith("#") or "=" not in line:
+def _load_env_from_dotenv(dotenv_paths: list[pathlib.Path]) -> None:
+    for p in dotenv_paths:
+        try:
+            if not p.exists():
                 continue
-            k, v = line.split("=", 1)
-            k = k.strip()
-            v = v.strip().strip('"').strip("'")
-            if k:
-                os.environ[k] = v
-    except Exception:
-        return
+            for raw in p.read_text(encoding="utf-8").splitlines():
+                line = raw.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+                k, v = line.split("=", 1)
+                k = k.strip()
+                v = v.strip().strip('"').strip("'")
+                if k:
+                    existing = os.environ.get(k)
+                    if existing is None or existing == "":
+                        os.environ[k] = v
+        except Exception:
+            continue
 
 
 def _rect_intersects(a: Tuple[float, float, float, float], b: Tuple[float, float, float, float]) -> bool:
@@ -577,7 +579,7 @@ def run(pdf_path: str, ade_chunks_path: pathlib.Path, cache_dir: pathlib.Path, o
 
     Returns: geometry map
     """
-    _load_env_from_dotenv()
+    _load_env_from_dotenv([pathlib.Path(".env.local"), pathlib.Path(".env")])
     sim_threshold = float(os.getenv("OCR_SIMILARITY_THRESHOLD", "0.30"))
     try:
         ocr_margin_x = float(os.getenv("OCR_MARGIN_X", "0.05"))
