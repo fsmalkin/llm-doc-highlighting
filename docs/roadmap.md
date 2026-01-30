@@ -5,17 +5,21 @@ It is intentionally scoped to the next few concrete milestones.
 
 ## P0 - Interactive demo (top priority)
 
-Goal: ship a small web app that lets a user query a fixed local document via the existing LLM span resolver, and view highlighted results in the Apryse viewer.
+Goal: ship a small web app that lets a user query a fixed local document via two approaches (indexed vs raw+fuzzy two-pass), and view highlighted results in the Apryse viewer.
 
 Deliverables
 - A simple web app in-repo (static UI + local API) that:
   - targets the fixed PDF path: demo-app\assets\Physician_Report_Scanned.pdf
   - lets the user enter a question
   - runs Phase 1 preprocessing to build cache artifacts (once)
-  - runs the existing LLM span resolver (no model changes)
+  - runs the existing LLM span resolver (indexed mode)
+  - runs a two-pass raw+fuzzy resolver (raw mode):
+    - Pass 1: LLM returns answer + raw/raw_extra without word indexes
+    - Fuzzy match raw/raw_extra against the document text
+    - If no unique exact match, send a narrowed indexed window to a cheap LLM for start/end tokens
   - renders highlights in the Apryse viewer and shows answer + source snippet
 - Transparency in the demo UI:
-  - show the LLM request and raw response payloads
+  - show the LLM request and raw response payloads (pass1/pass2 for raw mode)
   - show a "why this highlight" summary (token range, lines, pages, word_id count)
 - Clear documentation that users must bring their own LLM API key
 - A happy-path walkthrough using one sample document

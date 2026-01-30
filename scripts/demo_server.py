@@ -197,6 +197,38 @@ def _run_llm(
     return json.loads(out_path.read_text(encoding="utf-8"))
 
 
+def _run_llm_two_pass(question: str, *, prefer_ocr: bool | None = None, trace: bool = False) -> Dict[str, Any]:
+    doc_hash, _cache_dir = _ensure_preprocess(prefer_ocr=prefer_ocr)
+
+    out_dir = ARTIFACTS_ROOT / doc_hash
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out_path = out_dir / f"{_slugify(question)}_two_pass.json"
+
+    cmd = [
+        sys.executable,
+        str(REPO_ROOT / "scripts" / "two_pass_resolve_span.py"),
+        "--doc",
+        str(PDF_PATH),
+        "--doc_hash",
+        doc_hash,
+        "--query",
+        question,
+        "--out",
+        str(out_path),
+    ]
+    if trace:
+        cmd.append("--trace")
+    proc = subprocess.run(cmd, capture_output=True, text=True, cwd=str(REPO_ROOT))
+    if proc.returncode != 0:
+        msg = proc.stderr.strip() or proc.stdout.strip() or "Two-pass resolver failed"
+        raise RuntimeError(msg)
+
+    if not out_path.exists():
+        raise RuntimeError("Two-pass output missing")
+
+    return json.loads(out_path.read_text(encoding="utf-8"))
+
+
 class DemoHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         raw_path = urllib.parse.urlparse(self.path).path
@@ -214,6 +246,9 @@ class DemoHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/ask":
             self._handle_ask()
+            return
+        if self.path == "/api/ask_raw":
+            self._handle_ask_raw()
             return
         self._send_json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
@@ -327,6 +362,36 @@ class DemoHandler(SimpleHTTPRequestHandler):
             return
 
         # Limit payload for the UI
+        resp = {
+            "ok": True,
+            "doc_id": data.get("doc_id"),
+            "doc_hash": data.get("doc_hash"),
+            "query": data.get("query"),
+            "answer": data.get("answer"),
+            "source": data.get("source"),
+            "citation": data.get("citation"),
+            "span": data.get("span"),
+            "mapped": data.get("mapped"),
+            "meta": data.get("meta"),
+            "trace": data.get("trace"),
+        }
+        self._send_json(resp)
+
+    def _handle_ask_raw(self) -> None:
+        body = self._read_json()
+        question = str(body.get("question") or "").strip()
+        if not question:
+            self._send_json({"ok": False, "error": "Missing question"}, status=HTTPStatus.BAD_REQUEST)
+            return
+        trace_enabled = _read_env_flag("DEMO_TRACE_LLM", "1")
+        if "trace" in body:
+            trace_enabled = str(body.get("trace", "0")).strip() == "1"
+        try:
+            data = _run_llm_two_pass(question, trace=trace_enabled)
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+            return
+
         resp = {
             "ok": True,
             "doc_id": data.get("doc_id"),

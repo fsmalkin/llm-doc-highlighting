@@ -17,6 +17,8 @@ const cacheStatusEl = document.getElementById("cacheStatus");
 const modelStatusEl = document.getElementById("modelStatus");
 const systemStatusEl = document.getElementById("systemStatus");
 const statusDetailsEl = document.getElementById("statusDetails");
+const tabIndexedEl = document.getElementById("tabIndexed");
+const tabRawEl = document.getElementById("tabRaw");
 
 const btnAsk = document.getElementById("btnAsk");
 const btnClear = document.getElementById("btnClear");
@@ -29,6 +31,7 @@ let Annotations = null;
 let cacheReady = false;
 let preparing = false;
 let preparePromise = null;
+let mode = "indexed";
 
 function setStatus(msg, kind) {
   statusEl.textContent = String(msg || "");
@@ -54,6 +57,15 @@ function setLlmLog(trace) {
   if (!trace) {
     llmRequestEl.textContent = "-";
     llmResponseEl.textContent = "-";
+    return;
+  }
+  if (trace.pass1 || trace.pass2) {
+    llmRequestEl.textContent = JSON.stringify({ pass1: trace.pass1?.request, pass2: trace.pass2?.request }, null, 2);
+    llmResponseEl.textContent = JSON.stringify(
+      { pass1: trace.pass1?.response, pass2: trace.pass2?.response, window: trace.pass2?.window },
+      null,
+      2
+    );
     return;
   }
   const req = trace.request || {};
@@ -423,9 +435,8 @@ async function askQuestion() {
     if (!status?.cache_ready) {
       await ensurePrepared();
     }
-    const data = await postJson("/api/ask", {
-      question: q,
-    });
+    const endpoint = mode === "raw" ? "/api/ask_raw" : "/api/ask";
+    const data = await postJson(endpoint, { question: q });
     const answer = data?.answer || "";
     const citation = data?.citation || {};
     const pages = data?.mapped?.pages || [];
@@ -476,12 +487,26 @@ btnClear.addEventListener("click", () => {
   setStatus("Cleared highlights.", "ok");
 });
 
+function setMode(nextMode) {
+  mode = nextMode === "raw" ? "raw" : "indexed";
+  tabIndexedEl?.classList.toggle("active", mode === "indexed");
+  tabRawEl?.classList.toggle("active", mode === "raw");
+  setLlmLog(null);
+  setWhy("-");
+  setSource("-", "-");
+  setAnswer("-");
+}
+
+tabIndexedEl?.addEventListener("click", () => setMode("indexed"));
+tabRawEl?.addEventListener("click", () => setMode("raw"));
+
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");
 setSource("-", "-");
 setWhy("-");
 setLlmLog(null);
 setDebug(null);
+setMode("indexed");
 
 initViewer()
   .then(() => setStatus("Viewer ready.", "ok"))

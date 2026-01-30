@@ -178,6 +178,32 @@ textarea:focus {
   margin-top: 8px;
 }
 
+.tabs {
+  display: inline-flex;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px;
+  margin-bottom: 10px;
+}
+
+.tab {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.tab.active {
+  background: rgba(122, 162, 247, 0.2);
+  color: var(--text);
+  border: 1px solid rgba(122, 162, 247, 0.45);
+}
+
 button {
   border: 1px solid var(--border);
   background: rgba(255, 255, 255, 0.06);
