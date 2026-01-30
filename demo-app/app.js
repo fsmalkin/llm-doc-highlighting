@@ -377,6 +377,31 @@ async function initViewer() {
     });
   }
 
+  if (UI?.disableFeatures) {
+    try {
+      UI.disableFeatures([
+        "Annotations",
+        "AnnotationEdit",
+        "AnnotationTools",
+        "TextSelection",
+        "Copy",
+        "Search",
+        "NotesPanel",
+        "Outline",
+        "ThumbnailsPanel",
+        "LeftPanel",
+        "RightPanel",
+        "Ribbons",
+        "Download",
+        "Print",
+        "Fullscreen",
+        "ContentEdit",
+        "Measurement",
+        "MultiTab",
+      ]);
+    } catch {}
+  }
+
   if (UI?.disableElements) {
     try {
       UI.disableElements([
@@ -418,6 +443,12 @@ async function initViewer() {
         "editToolButton",
         "formsToolButton",
         "measureToolButton",
+        "searchOverlay",
+        "searchPanel",
+        "contextMenuPopup",
+        "annotationPopup",
+        "textPopup",
+        "annotationStylePopup",
       ]);
     } catch {}
   }
