@@ -42,6 +42,17 @@ Walkthrough:
 Example question:
 - What is the date of visit?
 
+## Optional automated UI check
+
+This repo includes a Playwright smoke test that starts the demo server,
+opens the UI, and confirms Quick Start badges populate:
+
+  python scripts\\uat_demo_smoke.py
+
+Screenshot output:
+
+  artifacts\\uat\\demo_smoke.png
+
 ## Fixed document
 
 The demo uses:
