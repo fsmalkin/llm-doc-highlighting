@@ -182,6 +182,16 @@ select:focus {
   box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
 }
 
+select option {
+  color: #0b0d12;
+  background: #ffffff;
+}
+
+select option:checked {
+  color: #ffffff;
+  background: #1f6feb;
+}
+
 textarea:focus {
   border-color: rgba(122, 162, 247, 0.8);
   box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);

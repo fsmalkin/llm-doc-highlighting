@@ -442,7 +442,7 @@ async function askQuestion() {
     const answer = data?.answer || "";
     const citation = data?.citation || {};
     const pages = data?.mapped?.pages || [];
-    const valueType = data?.value_type;
+    const valueTypeResponse = data?.value_type;
 
     setAnswer(answer || "(no answer)");
     const sourceText = data?.source || citation.substr || "(no citation)";
@@ -450,8 +450,8 @@ async function askQuestion() {
     if (citation.start_token != null && citation.end_token != null) {
       metaParts.push(`tokens ${citation.start_token}-${citation.end_token}`);
     }
-    if (valueType) {
-      metaParts.push(`type ${valueType}`);
+    if (valueTypeResponse) {
+      metaParts.push(`type ${valueTypeResponse}`);
     }
     if (Array.isArray(pages) && pages.length) {
       const pnums = pages.map((p) => p.page).filter(Boolean);
