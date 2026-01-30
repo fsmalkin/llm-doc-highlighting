@@ -23,6 +23,7 @@ UI affordances:
 - Data type selector steers the LLM to return value-only spans (Auto will infer the best type).
 - "LLM request/response" log shows the exact prompt and raw reply.
 - "Why this highlight" summarizes tokens, lines, pages, and word_id count.
+- Highlights are rendered as line unions (contiguous per line) to match rails UX.
 
 Optional tuning (see .env.local.example):
 - OPENAI_MODEL_PASS1 / OPENAI_MODEL_PASS2

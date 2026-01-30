@@ -193,6 +193,34 @@ def _union_bbox(bboxes: List[List[float]]) -> Optional[List[float]]:
     return [float(x0), float(y0), float(x1), float(y1)]
 
 
+def _line_union_boxes(
+    word_ids: List[str],
+    words_by_id: Dict[str, Dict[str, Any]],
+) -> Dict[int, List[List[float]]]:
+    by_line: Dict[Tuple[int, str], List[List[float]]] = {}
+    for wid in word_ids:
+        rec = words_by_id.get(wid) or {}
+        try:
+            page_no = int(rec.get("page", 0) or 0)
+        except Exception:
+            page_no = 0
+        line_id = str(rec.get("line_id") or "")
+        quad = rec.get("quad")
+        if not line_id or not isinstance(quad, list) or len(quad) != 8:
+            continue
+        bb = _bbox_from_quad([float(v) for v in quad])
+        if not bb:
+            continue
+        by_line.setdefault((page_no, line_id), []).append(bb)
+
+    by_page: Dict[int, List[List[float]]] = {}
+    for (page_no, _line_id), bbs in by_line.items():
+        merged = _union_bbox(bbs)
+        if merged:
+            by_page.setdefault(page_no, []).append(merged)
+    return by_page
+
+
 def _poly_from_bbox_y_up(bbox: List[float]) -> List[List[float]]:
     x0, y0, x1, y1 = [float(v) for v in bbox]
     if x0 > x1:
@@ -507,6 +535,8 @@ def _map_span_to_geometry(ctx: Dict[str, Any], start_token: int, end_token: int,
         if bb:
             by_page_bboxes.setdefault(page_no, []).append(bb)
 
+    by_page_line_boxes = _line_union_boxes(word_ids, words_by_id)
+
     page_sizes = _page_sizes_from_pdf(pdf_path)
     answer_pages: List[Dict[str, Any]] = []
     for page_no in sorted(by_page_quads.keys()):
@@ -522,6 +552,7 @@ def _map_span_to_geometry(ctx: Dict[str, Any], start_token: int, end_token: int,
                 "bbox_abs": bbox_abs,
                 "poly_norm": poly_norm,
                 "word_quads_abs": by_page_quads.get(page_no, []),
+                "line_bboxes_abs": by_page_line_boxes.get(page_no, []),
             }
         )
 

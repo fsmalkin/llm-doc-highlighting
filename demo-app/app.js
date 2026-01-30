@@ -293,10 +293,15 @@ function renderHighlights(pages) {
   const byPage = new Map();
   for (const pg of pages || []) {
     const pageNo = Number(pg?.page || 0);
+    const lineBoxes = Array.isArray(pg?.line_bboxes_abs) ? pg.line_bboxes_abs : [];
     const quads = Array.isArray(pg?.word_quads_abs) ? pg.word_quads_abs : [];
-    if (!pageNo || !quads.length) continue;
-    if (!byPage.has(pageNo)) byPage.set(pageNo, []);
-    byPage.get(pageNo).push(...quads);
+    if (!pageNo || (!lineBoxes.length && !quads.length)) continue;
+    if (!byPage.has(pageNo)) byPage.set(pageNo, { lineBoxes: [], quads: [] });
+    if (lineBoxes.length) {
+      byPage.get(pageNo).lineBoxes.push(...lineBoxes);
+    } else {
+      byPage.get(pageNo).quads.push(...quads);
+    }
   }
 
   const pagesSorted = Array.from(byPage.keys()).sort((a, b) => a - b);
@@ -306,10 +311,26 @@ function renderHighlights(pages) {
   for (const pageNo of pagesSorted) {
     const hl = new Annotations.TextHighlightAnnotation();
     hl.PageNumber = pageNo;
-    hl.Quads = byPage
-      .get(pageNo)
-      .map((q) => quadToApryseQuad(Core, q))
-      .filter(Boolean);
+    const payload = byPage.get(pageNo);
+    if (payload.lineBoxes.length) {
+      hl.Quads = payload.lineBoxes
+        .map((b) => {
+          const [x0, y0, x1, y1] = (b || []).map((v) => Number(v));
+          if ([x0, y0, x1, y1].some((v) => Number.isNaN(v))) return null;
+          const TLx = x0;
+          const TLy = y1;
+          const BLx = x0;
+          const BLy = y0;
+          const TRx = x1;
+          const TRy = y1;
+          const BRx = x1;
+          const BRy = y0;
+          return new Core.Math.Quad(BLx, BLy, BRx, BRy, TRx, TRy, TLx, TLy);
+        })
+        .filter(Boolean);
+    } else {
+      hl.Quads = payload.quads.map((q) => quadToApryseQuad(Core, q)).filter(Boolean);
+    }
     hl.Color = new Annotations.Color(122, 162, 247);
     hl.Opacity = 0.45;
     hl.setCustomData?.("demo_hl", "1");
