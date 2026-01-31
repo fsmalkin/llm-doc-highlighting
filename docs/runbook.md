@@ -94,4 +94,4 @@ Outputs:
 
 Review in the demo UI:
 - Start the demo server (`python scripts\demo_server.py`)
-- Open http://127.0.0.1:8000/ and use the Eval Review panel to select a run and example.
+- Open http://127.0.0.1:8000/eval.html and use the Eval Review page to select a run and example.

@@ -199,6 +199,21 @@ select {
   outline: none;
 }
 
+input[type="text"] {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  outline: none;
+}
+
+input[type="text"]:focus {
+  border-color: rgba(122, 162, 247, 0.8);
+  box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
+}
+
 select:focus {
   border-color: rgba(122, 162, 247, 0.8);
   box-shadow: 0 0 0 3px rgba(122, 162, 247, 0.15);
@@ -347,6 +362,15 @@ details summary {
 
 .mono {
   font-family: Consolas, "Courier New", monospace;
+}
+
+.link {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 980px) {

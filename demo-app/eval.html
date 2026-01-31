@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Doc Highlighting - Eval Review</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./eval.css" />
+  </head>
+  <body>
+    <div class="wrap eval-wrap">
+      <aside class="panel">
+        <div class="panel-header">
+          <div class="kicker">Evaluation</div>
+          <h1>Eval Review</h1>
+          <p class="muted">
+            Browse a run, pick a document, and inspect a data point. The viewer shows ground truth vs A/B
+            method boxes.
+          </p>
+          <a class="link" href="/">Back to demo</a>
+        </div>
+
+        <div class="card">
+          <div class="label">Run</div>
+          <div class="row">
+            <label for="evalRunSelect">Eval run</label>
+            <select id="evalRunSelect">
+              <option value="">Loading runs...</option>
+            </select>
+          </div>
+          <div class="muted" id="evalRunMeta">-</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Browse</div>
+          <div class="row">
+            <label for="docSearch">Search documents</label>
+            <input id="docSearch" type="text" placeholder="Search by doc id..." />
+          </div>
+          <div class="row">
+            <label for="docSelect">Document</label>
+            <select id="docSelect">
+              <option value="">Select a run first</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="exampleSelect">Data point</label>
+            <select id="exampleSelect">
+              <option value="">Select a document first</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Legend</div>
+          <div class="legend">
+            <div class="legend-row">
+              <span class="swatch gt"></span>
+              <span>Ground truth (gold/green outline)</span>
+            </div>
+            <div class="legend-row">
+              <span class="swatch method-a"></span>
+              <span>Method A: Raw + Fuzzy (red outline)</span>
+            </div>
+            <div class="legend-row">
+              <span class="swatch method-b"></span>
+              <span>Method B: Indexed (blue outline)</span>
+            </div>
+          </div>
+          <p class="muted">
+            These are hollow boxes for clarity; overlap can be visually compared by alignment.
+          </p>
+        </div>
+
+        <div class="card">
+          <div class="label">Selected data point</div>
+          <div class="eval-block">
+            <div class="label">Field label</div>
+            <div id="evalFieldLabel" class="answer">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Expected value</div>
+            <div id="evalExpectedValue" class="answer">-</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">A/B summary</div>
+          <div class="ab-grid">
+            <div class="ab-head">Method</div>
+            <div class="ab-head">IoU</div>
+            <div class="ab-head">Precision</div>
+            <div class="ab-head">Recall</div>
+            <div class="ab-head">Pass2</div>
+
+            <div class="ab-label">Raw + Fuzzy</div>
+            <div id="metricRawIou" class="badge">-</div>
+            <div id="metricRawPrecision" class="badge">-</div>
+            <div id="metricRawRecall" class="badge">-</div>
+            <div id="metricRawPass2" class="badge">-</div>
+
+            <div class="ab-label">Indexed</div>
+            <div id="metricIndexedIou" class="badge">-</div>
+            <div id="metricIndexedPrecision" class="badge">-</div>
+            <div id="metricIndexedRecall" class="badge">-</div>
+            <div id="metricIndexedPass2" class="badge">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Raw + Fuzzy answer</div>
+            <div id="evalAnswerRaw" class="answer">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Indexed answer</div>
+            <div id="evalAnswerIndexed" class="answer">-</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="viewer">
+        <div id="wv"></div>
+      </main>
+    </div>
+
+    <script src="/webviewer/webviewer.min.js"></script>
+    <script src="./eval.js"></script>
+  </body>
+</html>

@@ -1,0 +1,73 @@
+:root {
+  --gt: #7ee787;
+  --method-a: #ff7b72;
+  --method-b: #7aa2f7;
+}
+
+.eval-wrap {
+  grid-template-columns: 380px 1fr;
+}
+
+.link {
+  display: inline-flex;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.legend {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+
+.swatch {
+  width: 18px;
+  height: 10px;
+  border-radius: 6px;
+  border: 2px solid currentColor;
+  background: transparent;
+}
+
+.swatch.gt {
+  color: var(--gt);
+}
+
+.swatch.method-a {
+  color: var(--method-a);
+}
+
+.swatch.method-b {
+  color: var(--method-b);
+}
+
+.ab-grid {
+  display: grid;
+  grid-template-columns: 1fr repeat(4, 64px);
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+}
+
+.ab-head {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.ab-label {
+  color: var(--text);
+}
