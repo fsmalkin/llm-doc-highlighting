@@ -1,0 +1,68 @@
+﻿[
+  {
+    "name": "gt_fix",
+    "type": "rectangle",
+    "attributes": [
+      {
+        "name": "field_label",
+        "mutable": true,
+        "input_type": "text",
+        "default_value": "",
+        "values": [""]
+      },
+      {
+        "name": "value",
+        "mutable": true,
+        "input_type": "text",
+        "default_value": "",
+        "values": [""]
+      },
+      {
+        "name": "value_type",
+        "mutable": true,
+        "input_type": "select",
+        "default_value": "",
+        "values": [
+          "",
+          "Date",
+          "Duration",
+          "Name",
+          "Phone",
+          "Email",
+          "Address",
+          "Number",
+          "Currency",
+          "Free-text"
+        ]
+      },
+      {
+        "name": "notes",
+        "mutable": true,
+        "input_type": "text",
+        "default_value": "",
+        "values": [""]
+      },
+      {
+        "name": "eval_example_id",
+        "mutable": true,
+        "input_type": "text",
+        "default_value": "",
+        "values": [""]
+      },
+      {
+        "name": "eval_run",
+        "mutable": true,
+        "input_type": "text",
+        "default_value": "",
+        "values": [""]
+      },
+      {
+        "name": "eval_url_params",
+        "mutable": true,
+        "input_type": "text",
+        "default_value": "",
+        "values": [""]
+      }
+    ]
+  }
+]

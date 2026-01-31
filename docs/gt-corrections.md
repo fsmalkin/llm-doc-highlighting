@@ -51,6 +51,12 @@ High-level steps:
 In-tool instructions:
 - Open the task/job and click the \"Guide\" panel in CVAT.
 - The guide mirrors `docs/cvat-guide.md` and contains the labeling checklist.
+- Each task has a per-document prompt section generated from `docs/eval-review-2.md`.
+
+To (re)create per-document tasks with prompts:
+```bash
+python scripts\\cvat_seed_tasks.py --reset
+```
 
 Import the export into repo JSON:
 ```bash
