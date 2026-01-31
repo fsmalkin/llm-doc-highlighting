@@ -5,6 +5,7 @@ This file summarizes evaluation mistakes and links to concrete cases in the Eval
 Prereq:
 - Run the demo server: `python scripts\demo_server.py`
 - Ensure the run file exists under `reports\funsd\`
+- Default demo URL is `http://127.0.0.1:8004/` (update links if you override `DEMO_PORT`).
 
 Run used for links:
 - `run_20260131_102617.json`
@@ -23,7 +24,7 @@ Run used for links:
 - Question: Fax
 - Expected: -0589 202 -887
 - Answer: 202-887-0689
-- Link: http://127.0.0.1:8000/eval.html?run=run_20260131_102617.json&doc=83624198&ex=83624198_q13
+- Link: http://127.0.0.1:8004/eval.html?run=run_20260131_102617.json&doc=83624198&ex=83624198_q13
 
 2) Single-token label confusion
 - Doc: 83443897
@@ -31,7 +32,7 @@ Run used for links:
 - Question: NO
 - Expected: X
 - Answer: L8557.002
-- Link: http://127.0.0.1:8000/eval.html?run=run_20260131_102617.json&doc=83443897&ex=83443897_q7
+- Link: http://127.0.0.1:8004/eval.html?run=run_20260131_102617.json&doc=83443897&ex=83443897_q7
 
 3) Multi-token value truncated
 - Doc: 91814768_91814769
@@ -39,7 +40,7 @@ Run used for links:
 - Question: 4. Question No.
 - Expected: Excise Increase Tobacco 1 relating Tax to
 - Answer: 1
-- Link: http://127.0.0.1:8000/eval.html?run=run_20260131_102617.json&doc=91814768_91814769&ex=91814768_91814769_q35
+- Link: http://127.0.0.1:8004/eval.html?run=run_20260131_102617.json&doc=91814768_91814769&ex=91814768_91814769_q35
 
 4) Long name value missed
 - Doc: 83641919_1921
@@ -47,7 +48,7 @@ Run used for links:
 - Question: Name of Account
 - Expected: Clark Gas Emra 7- Eleven Southland Walmart Ultra Diamond Dairy Mart Mobil Oil Amoco ACA
 - Answer: Quality Dairy
-- Link: http://127.0.0.1:8000/eval.html?run=run_20260131_102617.json&doc=83641919_1921&ex=83641919_1921_q89
+- Link: http://127.0.0.1:8004/eval.html?run=run_20260131_102617.json&doc=83641919_1921&ex=83641919_1921_q89
 
 5) Currency formatting drift
 - Doc: 87332450
@@ -55,11 +56,11 @@ Run used for links:
 - Question: Advance Registration Fee:
 - Expected: $135 00
 - Answer: $ 135.00
-- Link: http://127.0.0.1:8000/eval.html?run=run_20260131_102617.json&doc=87332450&ex=87332450_q31
+- Link: http://127.0.0.1:8004/eval.html?run=run_20260131_102617.json&doc=87332450&ex=87332450_q31
 
 ## How to create new links
 
-- Open http://127.0.0.1:8000/eval.html
+- Open http://127.0.0.1:8004/eval.html
 - Pick a run, document, and data point.
 - The URL updates with `run`, `doc`, and `ex` parameters.
 - Copy that URL into this file for future review.

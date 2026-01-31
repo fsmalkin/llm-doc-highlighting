@@ -251,7 +251,7 @@ async function refreshStatus() {
   } catch (err) {
     const isFile = window.location.protocol === "file:";
     if (isFile) {
-      setStatus("Status API unreachable. Open http://127.0.0.1:8000/ (not a file URL).", "bad");
+      setStatus("Status API unreachable. Open the demo server URL (not a file URL).", "bad");
     } else {
       setStatus(`Status API error: ${err.message}`, "bad");
     }

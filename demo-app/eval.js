@@ -41,6 +41,7 @@ let runData = null;
 let docIndex = [];
 let filteredDocIds = [];
 let currentDocId = null;
+let pendingDocId = null;
 let pendingOverlay = null;
 let currentRunName = "";
 let pendingSelection = null;
@@ -96,13 +97,27 @@ function clearOverlay() {
   }
 }
 
-function addRect(pageNo, bbox, color, tag) {
+function addRect(pageNo, bbox, color, tag, opts = {}) {
   if (!annotationManager || !Annotations) return null;
   const nums = (bbox || []).map((v) => Number(v));
   if (nums.length !== 4 || nums.some((v) => Number.isNaN(v))) return null;
   let [x0, y0, x1, y1] = nums;
   if (x0 > x1) [x0, x1] = [x1, x0];
   if (y0 > y1) [y0, y1] = [y1, y0];
+  const orig = { x0, y0, x1, y1 };
+  const pad = Number(opts.pad ?? 0);
+  if (Number.isFinite(pad) && pad !== 0) {
+    x0 -= pad;
+    y0 -= pad;
+    x1 += pad;
+    y1 += pad;
+    if (x1 - x0 < 0.5 || y1 - y0 < 0.5) {
+      x0 = orig.x0;
+      y0 = orig.y0;
+      x1 = orig.x1;
+      y1 = orig.y1;
+    }
+  }
   const rect = new Annotations.RectangleAnnotation();
   rect.PageNumber = Number(pageNo || 1);
   rect.X = x0;
@@ -110,7 +125,10 @@ function addRect(pageNo, bbox, color, tag) {
   rect.Width = Math.max(0.5, x1 - x0);
   rect.Height = Math.max(0.5, y1 - y0);
   rect.StrokeColor = color;
-  rect.StrokeThickness = 2;
+  rect.StrokeThickness = Number(opts.thickness ?? 2);
+  if (Number.isFinite(opts.opacity)) {
+    rect.Opacity = Number(opts.opacity);
+  }
   rect.NoFill = true;
   rect.setCustomData?.("eval_hl", "1");
   rect.setCustomData?.("eval_tag", tag || "");
@@ -133,30 +151,30 @@ function renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) {
   const abState = showRaw && showIndexed ? "on" : !showRaw && !showIndexed ? "off" : "partial";
 
   const created = [];
-  if (showGt) {
-    for (const b of gtBoxes || []) {
-      const ann = addRect(pageNo, b, green, "gt");
-      if (ann) created.push(ann);
-    }
-  }
   if (abState === "on") {
     const merged = dedupeBoxes([...(rawBoxes || []), ...(indexedBoxes || [])]);
     for (const b of merged) {
-      const ann = addRect(pageNo, b, amber, "ab");
+      const ann = addRect(pageNo, b, amber, "ab", { opacity: 0.65 });
       if (ann) created.push(ann);
     }
   } else if (abState === "partial") {
     if (showRaw) {
       for (const b of rawBoxes || []) {
-        const ann = addRect(pageNo, b, red, "raw");
+        const ann = addRect(pageNo, b, red, "raw", { opacity: 0.75 });
         if (ann) created.push(ann);
       }
     }
     if (showIndexed) {
       for (const b of indexedBoxes || []) {
-        const ann = addRect(pageNo, b, blue, "indexed");
+        const ann = addRect(pageNo, b, blue, "indexed", { opacity: 0.75 });
         if (ann) created.push(ann);
       }
+    }
+  }
+  if (showGt) {
+    for (const b of gtBoxes || []) {
+      const ann = addRect(pageNo, b, green, "gt", { pad: -1, thickness: 2.5 });
+      if (ann) created.push(ann);
     }
   }
   return created;
@@ -298,6 +316,15 @@ function syncABMaster() {
   }
 }
 
+function resolveFocusTag(tag) {
+  const showRaw = showRawEl ? showRawEl.checked : true;
+  const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
+  if ((tag === "raw" || tag === "indexed") && showRaw && showIndexed) {
+    return "ab";
+  }
+  return tag;
+}
+
 function focusOnAnnotations(annotations, pageNo) {
   if (!annotations || !annotations.length || !viewerInstance || !documentViewer) return;
   const first = annotations[0];
@@ -317,6 +344,15 @@ function focusOnAnnotations(annotations, pageNo) {
     },
     null
   );
+  const pad = rect ? Math.max(6, Math.min(24, (rect.y1 - rect.y0) * 0.3)) : 8;
+  const paddedRect = rect
+    ? {
+        x0: rect.x0 - pad,
+        y0: rect.y0 - pad,
+        x1: rect.x1 + pad,
+        y1: rect.y1 + pad,
+      }
+    : null;
   try {
     if (viewerInstance?.UI?.setZoomLevel) {
       viewerInstance.UI.setZoomLevel(2);
@@ -327,20 +363,94 @@ function focusOnAnnotations(annotations, pageNo) {
   try {
     documentViewer.setCurrentPage?.(pageNo);
   } catch {}
+  try {
+    annotationManager?.selectAnnotation?.(first);
+  } catch {}
+  const applyViewRect = () => {
+    if (!paddedRect || !Core?.Math?.Rect) return;
+    const viewRect = new Core.Math.Rect(
+      paddedRect.x0,
+      paddedRect.y0,
+      Math.max(1, paddedRect.x1 - paddedRect.x0),
+      Math.max(1, paddedRect.y1 - paddedRect.y0)
+    );
+    if (typeof documentViewer.displayPageLocation === "function") {
+      const center = new Core.Math.Point(
+        paddedRect.x0 + (paddedRect.x1 - paddedRect.x0) / 2,
+        paddedRect.y0 + (paddedRect.y1 - paddedRect.y0) / 2
+      );
+      try {
+        documentViewer.displayPageLocation(pageNo, center, 2);
+        return;
+      } catch {}
+    }
+    if (typeof documentViewer.setViewRect === "function") {
+      try {
+        if (documentViewer.setViewRect.length >= 3) {
+          documentViewer.setViewRect(viewRect, pageNo, true);
+        } else if (documentViewer.setViewRect.length === 2) {
+          documentViewer.setViewRect(viewRect, pageNo);
+        } else {
+          documentViewer.setViewRect(viewRect);
+        }
+      } catch {}
+    }
+  };
+  const applyDomScroll = () => {
+    if (!paddedRect) return;
+    try {
+      const host = document.querySelector("apryse-webviewer");
+      const root = host?.shadowRoot;
+      if (!root) return;
+      const container = root.querySelector(".DocumentContainer");
+      const pageEl = root.querySelector(`#pageContainer${pageNo}`) || root.querySelector(".pageContainer");
+      if (!container || !pageEl) return;
+
+      let pageHeight = null;
+      let pageWidth = null;
+      try {
+        const doc = documentViewer.getDocument?.();
+        const info = doc?.getPageInfo?.(pageNo);
+        if (info && typeof info.height === "number") pageHeight = info.height;
+        if (info && typeof info.width === "number") pageWidth = info.width;
+        if (!pageHeight && typeof documentViewer.getPageHeight === "function") {
+          const h = documentViewer.getPageHeight(pageNo);
+          if (Number.isFinite(h)) pageHeight = h;
+        }
+        if (!pageWidth && typeof documentViewer.getPageWidth === "function") {
+          const w = documentViewer.getPageWidth(pageNo);
+          if (Number.isFinite(w)) pageWidth = w;
+        }
+      } catch {}
+
+      const pageRect = pageEl.getBoundingClientRect();
+      const containerRect = container.getBoundingClientRect();
+      const scale = pageHeight ? pageRect.height / pageHeight : 1;
+      const centerY = (paddedRect.y0 + paddedRect.y1) / 2;
+      const targetY = pageEl.offsetTop + centerY * scale;
+      const nextTop = Math.max(0, targetY - containerRect.height / 2);
+      container.scrollTop = Math.min(nextTop, container.scrollHeight - containerRect.height);
+
+      const scaleX = pageWidth ? pageRect.width / pageWidth : scale;
+      const centerX = (paddedRect.x0 + paddedRect.x1) / 2;
+      const targetX = pageEl.offsetLeft + centerX * scaleX;
+      const nextLeft = Math.max(0, targetX - containerRect.width / 2);
+      container.scrollLeft = Math.min(nextLeft, container.scrollWidth - containerRect.width);
+    } catch {}
+  };
   requestAnimationFrame(() => {
     try {
       if (typeof documentViewer.jumpToAnnotation === "function") {
         documentViewer.jumpToAnnotation(first, { animate: true });
-        return;
       } else if (typeof documentViewer.scrollToAnnotation === "function") {
         documentViewer.scrollToAnnotation(first, { animate: true });
-        return;
       }
     } catch {}
-    if (rect && Core?.Math?.Rect && typeof documentViewer.setViewRect === "function") {
-      const viewRect = new Core.Math.Rect(rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0);
-      documentViewer.setViewRect(viewRect, true, true);
-    }
+    requestAnimationFrame(() => {
+      applyViewRect();
+      applyDomScroll();
+      documentViewer.updateView?.();
+    });
   });
 }
 
@@ -356,12 +466,7 @@ function focusByTag(tag) {
     pendingFocusTag = tag;
     return;
   }
-  let resolvedTag = tag;
-  const showRaw = showRawEl ? showRawEl.checked : true;
-  const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
-  if ((tag === "raw" || tag === "indexed") && showRaw && showIndexed) {
-    resolvedTag = "ab";
-  }
+  const resolvedTag = resolveFocusTag(tag);
   let anns = getAnnotationsByTag(resolvedTag);
   if (!anns.length && resolvedTag !== tag) {
     anns = getAnnotationsByTag(tag);
@@ -373,6 +478,9 @@ function focusByTag(tag) {
     return;
   }
   const pageNo = anns[0]?.PageNumber || 1;
+  try {
+    document.body.dataset.evalFocusTag = resolvedTag;
+  } catch {}
   focusOnAnnotations(anns, pageNo);
   pendingFocusTag = null;
 }
@@ -522,7 +630,7 @@ function findExampleById(id) {
   return null;
 }
 
-function renderExample(ex, opts = { focus: true }) {
+function renderExample(ex, opts = { focus: true, focusTag: null }) {
   if (!ex) return;
   syncABMaster();
   setText(evalFieldLabelEl, ex.question);
@@ -547,13 +655,27 @@ function renderExample(ex, opts = { focus: true }) {
   const docId = ex.doc_id;
   const url = `/api/eval_pdf?doc_id=${encodeURIComponent(docId)}`;
   if (!viewerInstance || !documentViewer) {
-    pendingOverlay = { gt: gtRender, raw: rawRender, indexed: indexedRender, page: pageNo, focus: opts.focus };
-    currentDocId = docId;
+    pendingOverlay = {
+      gt: gtRender,
+      raw: rawRender,
+      indexed: indexedRender,
+      page: pageNo,
+      focus: opts.focus,
+      focusTag: opts.focusTag || null,
+    };
+    pendingDocId = docId;
     return;
   }
   if (currentDocId !== docId) {
-    currentDocId = docId;
-    pendingOverlay = { gt: gtRender, raw: rawRender, indexed: indexedRender, page: pageNo, focus: opts.focus };
+    pendingDocId = docId;
+    pendingOverlay = {
+      gt: gtRender,
+      raw: rawRender,
+      indexed: indexedRender,
+      page: pageNo,
+      focus: opts.focus,
+      focusTag: opts.focusTag || null,
+    };
     try {
       viewerInstance.UI.loadDocument(url);
     } catch {}
@@ -562,7 +684,20 @@ function renderExample(ex, opts = { focus: true }) {
     if (opts.focus) {
       focusOnAnnotations(anns, pageNo);
     }
-    if (pendingFocusTag) {
+    const focusTag = opts.focusTag ? resolveFocusTag(opts.focusTag) : null;
+    if (focusTag) {
+      const focusAnns = anns.filter((ann) => ann?.getCustomData?.("eval_tag") === focusTag);
+      if (focusAnns.length) {
+        try {
+          document.body.dataset.evalFocusTag = focusTag;
+        } catch {}
+        focusOnAnnotations(focusAnns, pageNo);
+        pendingFocusTag = null;
+      } else {
+        pendingFocusTag = focusTag;
+        setTimeout(() => focusByTag(focusTag), 50);
+      }
+    } else if (pendingFocusTag) {
       focusByTag(pendingFocusTag);
     }
   }
@@ -694,7 +829,12 @@ async function loadRun(name) {
 
 async function initViewer() {
   const webviewerPath = new URL("/webviewer", window.location.href).href.replace(/\/$/, "");
-  const initialDoc = new URL(DEFAULT_DOC, window.location.href).href;
+  const initialParams = getEvalParams();
+  let initialDoc = new URL(DEFAULT_DOC, window.location.href).href;
+  if (initialParams?.doc) {
+    initialDoc = `${window.location.origin}/api/eval_pdf?doc_id=${encodeURIComponent(initialParams.doc)}`;
+    pendingDocId = initialParams.doc;
+  }
   viewerInstance = await WebViewer({ path: webviewerPath, initialDoc, fullAPI: true }, document.getElementById("wv"));
   Core = viewerInstance.Core;
   const UI = viewerInstance.UI;
@@ -704,6 +844,13 @@ async function initViewer() {
 
   if (documentViewer?.addEventListener) {
     documentViewer.addEventListener("documentLoaded", () => {
+      if (pendingDocId) {
+        currentDocId = pendingDocId;
+        pendingDocId = null;
+      }
+      try {
+        document.body.dataset.evalDocId = currentDocId || "";
+      } catch {}
       if (UI?.setZoomLevel) {
         UI.setZoomLevel(1);
       } else if (documentViewer?.setZoomLevel) {
@@ -714,6 +861,20 @@ async function initViewer() {
           renderOverlay(pendingOverlay.gt, pendingOverlay.raw, pendingOverlay.indexed, pendingOverlay.page) || [];
         if (pendingOverlay.focus) {
           focusOnAnnotations(anns, pendingOverlay.page);
+        }
+        if (pendingOverlay.focusTag) {
+          const focusTag = resolveFocusTag(pendingOverlay.focusTag);
+          const focusAnns = anns.filter((ann) => ann?.getCustomData?.("eval_tag") === focusTag);
+          if (focusAnns.length) {
+            try {
+              document.body.dataset.evalFocusTag = focusTag;
+            } catch {}
+            focusOnAnnotations(focusAnns, pendingOverlay.page);
+            pendingFocusTag = null;
+          } else {
+            pendingFocusTag = focusTag;
+            setTimeout(() => focusByTag(focusTag), 50);
+          }
         }
         pendingOverlay = null;
       }
@@ -861,8 +1022,7 @@ for (const target of focusTargets) {
     if (target.tag === "raw" && showRawEl && !showRawEl.checked) showRawEl.checked = true;
     if (target.tag === "indexed" && showIndexedEl && !showIndexedEl.checked) showIndexedEl.checked = true;
     const ex = findExampleById(String(exampleSelectEl.value || ""));
-    if (ex) renderExample(ex, { focus: false });
-    focusByTag(target.tag);
+    if (ex) renderExample(ex, { focus: false, focusTag: target.tag });
   });
 }
 

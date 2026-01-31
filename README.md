@@ -65,10 +65,7 @@ Run:
 python scripts\demo_server.py
 ```
 
-Then open:
-```
-http://127.0.0.1:8000/
-```
+Then open the URL printed at startup (default `http://127.0.0.1:8004/`). If the page does not load, set `DEMO_PORT`.
 
 Fixed document (baked OCR PDF):
 ```

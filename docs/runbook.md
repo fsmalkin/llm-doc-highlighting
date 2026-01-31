@@ -66,10 +66,7 @@ Run:
 python scripts\demo_server.py
 ```
 
-Open:
-```
-http://127.0.0.1:8000/
-```
+Open the URL printed at startup (default `http://127.0.0.1:8004/`).
 
 Fixed document:
 ```
@@ -94,5 +91,5 @@ Outputs:
 
 Review in the demo UI:
 - Start the demo server (`python scripts\demo_server.py`)
-- Open http://127.0.0.1:8000/stats.html to review aggregate statistics.
-- Open http://127.0.0.1:8000/eval.html to inspect per-example overlays (use the run selector or deep link via `?run=`).
+- Open `/stats.html` on the demo host to review aggregate statistics.
+- Open `/eval.html` on the demo host to inspect per-example overlays (use the run selector or deep link via `?run=`).

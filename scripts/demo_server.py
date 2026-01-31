@@ -19,7 +19,10 @@ import pathlib
 import re
 import subprocess
 import sys
+import threading
+import time
 import urllib.parse
+import urllib.request
 from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any, Dict, Tuple
@@ -257,6 +260,9 @@ def _run_llm_two_pass(
 class DemoHandler(SimpleHTTPRequestHandler):
     def do_GET(self) -> None:
         raw_path = urllib.parse.urlparse(self.path).path
+        if raw_path == "/api/ping":
+            self._send_json({"ok": True})
+            return
         if raw_path == "/api/status":
             self._handle_status()
             return
@@ -273,6 +279,13 @@ class DemoHandler(SimpleHTTPRequestHandler):
             self._send_json({"ok": False, "error": "Use POST"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
             return
         super().do_GET()
+
+    def do_HEAD(self) -> None:
+        raw_path = urllib.parse.urlparse(self.path).path
+        if raw_path == "/api/eval_pdf":
+            self._handle_eval_pdf(head_only=True)
+            return
+        super().do_HEAD()
 
     def do_POST(self) -> None:
         if self.path == "/api/preprocess":
@@ -425,7 +438,7 @@ class DemoHandler(SimpleHTTPRequestHandler):
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
-    def _handle_eval_pdf(self) -> None:
+    def _handle_eval_pdf(self, *, head_only: bool = False) -> None:
         try:
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query or "")
@@ -434,6 +447,17 @@ class DemoHandler(SimpleHTTPRequestHandler):
                 self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
                 return
             pdf_path = FUNSD_PDF_ROOT / f"{doc_id}.pdf"
+            if head_only:
+                if not pdf_path.exists() or not pdf_path.is_file():
+                    self.send_response(HTTPStatus.NOT_FOUND.value)
+                    self.end_headers()
+                    return
+                size = pdf_path.stat().st_size
+                self.send_response(HTTPStatus.OK.value)
+                self.send_header("Content-Type", "application/pdf")
+                self.send_header("Content-Length", str(size))
+                self.end_headers()
+                return
             self._send_file(pdf_path, content_type="application/pdf")
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -513,13 +537,53 @@ def main() -> None:
     mimetypes.add_type("application/pdf", ".pdf")
 
     host = os.getenv("DEMO_HOST", "127.0.0.1")
-    port = int(os.getenv("DEMO_PORT", "8000"))
-    httpd = ThreadingHTTPServer((host, port), DemoHandler)
+    port = int(os.getenv("DEMO_PORT", "8004"))
+
+    def _start_server(bind_port: int):
+        httpd = ThreadingHTTPServer((host, bind_port), DemoHandler)
+        thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+        thread.start()
+        return httpd, thread
+
+    def _health_check(check_port: int) -> bool:
+        check_host = host
+        if check_host in ("0.0.0.0", "::", ""):
+            check_host = "127.0.0.1"
+        url = f"http://{check_host}:{check_port}/api/ping"
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        time.sleep(0.3)
+        for _ in range(10):
+            try:
+                with opener.open(url, timeout=2) as resp:
+                    return resp.status == 200
+            except Exception:
+                time.sleep(0.25)
+        return False
+
+    httpd, thread = _start_server(port)
+    if not _health_check(port):
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
+        if port != 8004:
+            raise RuntimeError("Demo server health check failed. Try a different DEMO_PORT.")
+        fallback_port = 8005
+        httpd, thread = _start_server(fallback_port)
+        if not _health_check(fallback_port):
+            httpd.shutdown()
+            httpd.server_close()
+            thread.join(timeout=2)
+            raise RuntimeError("Demo server health check failed. Try a different DEMO_PORT.")
+        print(f"Port {port} did not respond; using http://{host}:{fallback_port}")
+        port = fallback_port
+
     print(f"Demo server running on http://{host}:{port}")
     try:
-        httpd.serve_forever()
+        thread.join()
     except KeyboardInterrupt:
-        pass
+        httpd.shutdown()
+        httpd.server_close()
+        thread.join(timeout=2)
 
 
 if __name__ == "__main__":

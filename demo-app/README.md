@@ -37,7 +37,7 @@ From the repo root:
 
 Then open:
 
-  http://127.0.0.1:8000/
+  Use the URL printed at startup (default `http://127.0.0.1:8004/`).
 
 Walkthrough:
 1) Confirm the System status chip shows preparing/ready (expand for details).
