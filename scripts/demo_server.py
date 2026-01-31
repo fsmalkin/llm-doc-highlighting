@@ -27,7 +27,7 @@ from typing import Any, Dict, Tuple
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 DEMO_ROOT = REPO_ROOT / "demo-app"
 WEBVIEWER_ROOT = REPO_ROOT / "docs" / "webviewer"
-PDF_PATH = DEMO_ROOT / "assets" / "Physician_Report_Scanned.pdf"
+PDF_PATH = DEMO_ROOT / "assets" / "Physician_Report_Scanned-ocr.pdf"
 CACHE_ROOT = REPO_ROOT / "cache"
 ARTIFACTS_ROOT = REPO_ROOT / "artifacts" / "demo"
 DEFAULT_MODEL = "gpt-5-mini"

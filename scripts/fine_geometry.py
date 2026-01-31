@@ -261,6 +261,7 @@ def _extract_pdf_words_with_vision(pdf_path: str, scale: float = 2.0) -> Dict[in
             for pg in resp.full_text_annotation.pages:
                 for blk in pg.blocks:
                     block_idx += 1
+                    block_line_idx = 0
                     para_idx = 0
                     for para in blk.paragraphs:
                         para_idx += 1
@@ -299,6 +300,7 @@ def _extract_pdf_words_with_vision(pdf_path: str, scale: float = 2.0) -> Dict[in
                         line_idx = 0
                         for line_words in lines_in_para:
                             line_idx += 1
+                            block_line_idx += 1
                             for wobj in sorted(line_words, key=lambda x: float(x["bbox"][0])):
                                 order_counter += 1
                                 words.append(
@@ -307,7 +309,7 @@ def _extract_pdf_words_with_vision(pdf_path: str, scale: float = 2.0) -> Dict[in
                                         "page": pno + 1,
                                         "bbox": wobj["bbox"],
                                         "block": block_idx,
-                                        "line": line_idx,
+                                        "line": block_line_idx,
                                         "_order": order_counter,
                                     }
                                 )
@@ -376,7 +378,13 @@ def _split_by_x_gap(words: List[Dict[str, Any]], gap_ratio: float = 0.4) -> List
     return [words[:split_idx], words[split_idx:]]
 
 
-def _group_lines(words: List[Dict[str, Any]], *, split_on_gap: bool = False, gap_ratio: float = 0.4) -> List[Dict[str, Any]]:
+def _group_lines(
+    words: List[Dict[str, Any]],
+    *,
+    split_on_gap: bool = False,
+    gap_ratio: float = 0.4,
+    preserve_order: bool = False,
+) -> List[Dict[str, Any]]:
     """
     Group words into lines using (page, block, line). If block/line not available, group by y-bands.
     """
@@ -471,7 +479,14 @@ def _group_lines(words: List[Dict[str, Any]], *, split_on_gap: bool = False, gap
                 lines.append({"line_id": line_id, "page": page, "bbox": list(bbox_union), "word_ids": [], "_words": band})
                 lid += 1
 
-    lines.sort(key=lambda ln: (int(ln.get("page", 0)), float(ln.get("bbox", [0, 0, 0, 0])[1]), float(ln.get("bbox", [0, 0, 0, 0])[0])))
+    if not preserve_order or missing_struct:
+        lines.sort(
+            key=lambda ln: (
+                int(ln.get("page", 0)),
+                float(ln.get("bbox", [0, 0, 0, 0])[1]),
+                float(ln.get("bbox", [0, 0, 0, 0])[0]),
+            )
+        )
     return lines
 
 
@@ -791,7 +806,12 @@ def run(pdf_path: str, ade_chunks_path: pathlib.Path, cache_dir: pathlib.Path, o
 
         # Lines
         if words_src:
-            lines = _group_lines(words_src, split_on_gap=vision_split_on_gap and words_source.startswith("vision"), gap_ratio=vision_gap_ratio)
+            lines = _group_lines(
+                words_src,
+                split_on_gap=vision_split_on_gap and words_source.startswith("vision"),
+                gap_ratio=vision_gap_ratio,
+                preserve_order=words_source.startswith("vision"),
+            )
             # Link line.word_ids by approximate bbox equality in reading order
             def _find_word_id(bbox: List[float]) -> Optional[str]:
                 for ww in words_list:

@@ -1,5 +1,5 @@
 const DEFAULT_QUESTION = "What is the date of visit?";
-const DEFAULT_DOC = "./assets/Physician_Report_Scanned.pdf";
+const DEFAULT_DOC = "./assets/Physician_Report_Scanned-ocr.pdf";
 
 const statusEl = document.getElementById("status");
 const answerEl = document.getElementById("answer");

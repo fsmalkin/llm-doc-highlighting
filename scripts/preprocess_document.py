@@ -118,15 +118,20 @@ def _synthesize_chunks_without_provider(src_path: pathlib.Path) -> list[dict[str
     chunks: list[dict[str, Any]] = []
 
     # Prefer Vision words; fallback to PDF text layer.
+    words_source = "none"
     try:
         page_words = fine_geometry._extract_pdf_words_with_vision(str(src_path))  # type: ignore[attr-defined]
     except Exception:
         page_words = {}
-    if not page_words:
+    if page_words:
+        words_source = "vision"
+    else:
         try:
             page_words = fine_geometry._extract_pdf_words(str(src_path)) if fine_geometry.fitz is not None else {}  # type: ignore[attr-defined]
         except Exception:
             page_words = {}
+        if page_words:
+            words_source = "pdf"
 
     if page_words:
         chunk_idx = 1
@@ -134,7 +139,11 @@ def _synthesize_chunks_without_provider(src_path: pathlib.Path) -> list[dict[str
             # fine_geometry._group_lines expects each word to include a "page" field.
             words_with_page = [{**w, "page": int(page_num)} for w in (words or [])]
             try:
-                lines = fine_geometry._group_lines(words_with_page, split_on_gap=True)  # type: ignore[attr-defined]
+                lines = fine_geometry._group_lines(
+                    words_with_page,
+                    split_on_gap=True,
+                    preserve_order=words_source == "vision",
+                )  # type: ignore[attr-defined]
             except Exception:
                 lines = []
 

@@ -70,9 +70,14 @@ Then open:
 http://127.0.0.1:8000/
 ```
 
-Fixed document:
+Fixed document (baked OCR PDF):
 ```
-demo-app\assets\Physician_Report_Scanned.pdf
+demo-app\assets\Physician_Report_Scanned-ocr.pdf
+```
+
+Re-bake (optional):
+```
+powershell -ExecutionPolicy Bypass -File scripts\Ocr-PDF.ps1 -Input "demo-app/assets/Physician_Report_Scanned.pdf" -Sidecar
 ```
 
 Walkthrough:
