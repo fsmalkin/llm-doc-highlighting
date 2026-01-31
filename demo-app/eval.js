@@ -44,6 +44,7 @@ let currentDocId = null;
 let pendingOverlay = null;
 let currentRunName = "";
 let pendingSelection = null;
+let pendingFocusTag = null;
 
 function setText(el, text) {
   if (!el) return;
@@ -321,6 +322,37 @@ function focusOnAnnotations(annotations, pageNo) {
   });
 }
 
+function getAnnotationsByTag(tag) {
+  if (!annotationManager) return [];
+  const list = Array.from(annotationManager.getAnnotationsList?.() || []);
+  return list.filter((ann) => ann?.getCustomData?.("eval_tag") === tag);
+}
+
+function focusByTag(tag) {
+  if (!tag) return;
+  if (!annotationManager || !documentViewer) {
+    pendingFocusTag = tag;
+    return;
+  }
+  let resolvedTag = tag;
+  const showRaw = showRawEl ? showRawEl.checked : true;
+  const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
+  if ((tag === "raw" || tag === "indexed") && showRaw && showIndexed) {
+    resolvedTag = "ab";
+  }
+  let anns = getAnnotationsByTag(resolvedTag);
+  if (!anns.length && resolvedTag !== tag) {
+    anns = getAnnotationsByTag(tag);
+  }
+  if (!anns.length) {
+    pendingFocusTag = tag;
+    return;
+  }
+  const pageNo = anns[0]?.PageNumber || 1;
+  focusOnAnnotations(anns, pageNo);
+  pendingFocusTag = null;
+}
+
 function buildDocIndex(examples) {
   const map = new Map();
   for (const ex of examples || []) {
@@ -506,6 +538,9 @@ function renderExample(ex, opts = { focus: true }) {
     if (opts.focus) {
       focusOnAnnotations(anns, pageNo);
     }
+    if (pendingFocusTag) {
+      focusByTag(pendingFocusTag);
+    }
   }
 }
 
@@ -658,6 +693,9 @@ async function initViewer() {
         }
         pendingOverlay = null;
       }
+      if (pendingFocusTag) {
+        focusByTag(pendingFocusTag);
+      }
     });
   }
 
@@ -787,6 +825,22 @@ evalRunSelectEl?.addEventListener("change", () => {
 });
 prevSampleEl?.addEventListener("click", () => stepSample(-1));
 nextSampleEl?.addEventListener("click", () => stepSample(1));
+const focusTargets = [
+  { el: evalExpectedValueEl, tag: "gt" },
+  { el: evalAnswerRawEl, tag: "raw" },
+  { el: evalAnswerIndexedEl, tag: "indexed" },
+];
+for (const target of focusTargets) {
+  if (!target.el) continue;
+  target.el.addEventListener("click", () => {
+    if (target.tag === "gt" && showGtEl && !showGtEl.checked) showGtEl.checked = true;
+    if (target.tag === "raw" && showRawEl && !showRawEl.checked) showRawEl.checked = true;
+    if (target.tag === "indexed" && showIndexedEl && !showIndexedEl.checked) showIndexedEl.checked = true;
+    const ex = findExampleById(String(exampleSelectEl.value || ""));
+    if (ex) renderExample(ex, { focus: false });
+    focusByTag(target.tag);
+  });
+}
 
 initViewer()
   .then(() => {
