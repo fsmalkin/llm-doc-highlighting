@@ -42,6 +42,8 @@ let docIndex = [];
 let filteredDocIds = [];
 let currentDocId = null;
 let pendingOverlay = null;
+let currentRunName = "";
+let pendingSelection = null;
 
 function setText(el, text) {
   if (!el) return;
@@ -411,6 +413,7 @@ function loadExamplesForDoc(docId, selectedExampleId = null) {
       : entry.examples[0];
   exampleSelectEl.value = target?.id || "";
   renderExample(target, { focus: true });
+  updateSelectionInUrl();
 }
 
 function stepSample(direction) {
@@ -506,9 +509,13 @@ function renderExample(ex, opts = { focus: true }) {
   }
 }
 
-function getRunFromUrl() {
+function getEvalParams() {
   const params = new URLSearchParams(window.location.search || "");
-  return params.get("run") || "";
+  return {
+    run: params.get("run") || "",
+    doc: params.get("doc") || "",
+    example: params.get("ex") || params.get("example") || "",
+  };
 }
 
 function updateRunInUrl(name) {
@@ -517,6 +524,32 @@ function updateRunInUrl(name) {
     params.set("run", name);
   } else {
     params.delete("run");
+  }
+  const qs = params.toString();
+  const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  if (window.history?.replaceState) {
+    window.history.replaceState(null, "", nextUrl);
+  }
+}
+
+function updateSelectionInUrl() {
+  const params = new URLSearchParams(window.location.search || "");
+  if (currentRunName) {
+    params.set("run", currentRunName);
+  } else {
+    params.delete("run");
+  }
+  const docId = String(docSelectEl?.value || "");
+  const exId = String(exampleSelectEl?.value || "");
+  if (docId) {
+    params.set("doc", docId);
+  } else {
+    params.delete("doc");
+  }
+  if (exId) {
+    params.set("ex", exId);
+  } else {
+    params.delete("ex");
   }
   const qs = params.toString();
   const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
@@ -558,7 +591,7 @@ async function loadRuns() {
     opt.textContent = name;
     evalRunSelectEl.appendChild(opt);
   }
-  const preferred = getRunFromUrl();
+  const preferred = pendingSelection?.run || "";
   const initial = preferred && runs.includes(preferred) ? preferred : runs[0];
   evalRunSelectEl.value = initial;
   updateRunInUrl(initial);
@@ -570,6 +603,7 @@ async function loadRun(name) {
   const data = await getJson(`/api/eval_run?name=${encodeURIComponent(name)}`);
   const sanitizedExamples = (data?.examples || []).map((ex) => sanitizeExample(ex));
   runData = { ...data, examples: sanitizedExamples };
+  currentRunName = name;
   const meta = data?.meta || {};
   const metaText = [`dataset ${meta.dataset}`, `split ${meta.split}`, `samples ${meta.sample_size}`]
     .filter(Boolean)
@@ -579,6 +613,24 @@ async function loadRun(name) {
 
   buildDocIndex(sanitizedExamples);
   applyDocFilter();
+  if (pendingSelection && (!pendingSelection.run || pendingSelection.run === name)) {
+    const docId = pendingSelection.doc;
+    const exId = pendingSelection.example;
+    let handled = false;
+    if (exId) {
+      const ex = findExampleById(exId);
+      if (ex) {
+        docSelectEl.value = ex.doc_id;
+        loadExamplesForDoc(ex.doc_id, ex.id);
+        handled = true;
+      }
+    }
+    if (!handled && docId) {
+      docSelectEl.value = docId;
+      loadExamplesForDoc(docId, exId || null);
+    }
+    pendingSelection = null;
+  }
 }
 
 async function initViewer() {
@@ -698,6 +750,7 @@ docSelectEl?.addEventListener("change", () => loadExamplesForDoc(String(docSelec
 exampleSelectEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: true });
+  updateSelectionInUrl();
 });
 showGtEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
@@ -737,6 +790,7 @@ nextSampleEl?.addEventListener("click", () => stepSample(1));
 
 initViewer()
   .then(() => {
+    pendingSelection = getEvalParams();
     return loadRuns().catch(() => setRunEmptyState());
   })
   .catch(() => {});
