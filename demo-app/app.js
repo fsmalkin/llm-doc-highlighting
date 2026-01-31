@@ -544,11 +544,9 @@ async function askQuestion() {
     setWhy(buildWhySummary(data));
     setLlmLog(data?.trace);
     setDebug(data);
-    if (valueTypeInferred && valueTypeResponse) {
-      setValueTypeIndicator(`Auto-detected type: ${valueTypeResponse}`);
-    } else {
-      setValueTypeIndicator(null);
-    }
+    const typeLabelRaw = valueTypeResponse || valueTypeRequested || "Free-text";
+    const typeLabel = valueTypeRequested === "Auto" ? `Type: ${typeLabelRaw} (auto)` : `Type: ${typeLabelRaw}`;
+    setValueTypeIndicator(typeLabel);
 
     const result = renderHighlights(pages);
     if (result && documentViewer) {
