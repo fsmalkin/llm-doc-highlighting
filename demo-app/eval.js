@@ -129,27 +129,33 @@ function renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) {
     abStatusEl.textContent = identical ? "identical" : "different";
   }
 
+  const created = [];
   if (showGt) {
     for (const b of gtBoxes || []) {
-      addRect(pageNo, b, green, "gt");
+      const ann = addRect(pageNo, b, green, "gt");
+      if (ann) created.push(ann);
     }
   }
   if (identical && mergeIdentical && showRaw && showIndexed) {
     for (const b of rawBoxes || []) {
-      addRect(pageNo, b, amber, "same");
+      const ann = addRect(pageNo, b, amber, "same");
+      if (ann) created.push(ann);
     }
   } else {
     if (showRaw) {
       for (const b of rawBoxes || []) {
-        addRect(pageNo, b, red, "raw");
+        const ann = addRect(pageNo, b, red, "raw");
+        if (ann) created.push(ann);
       }
     }
     if (showIndexed) {
       for (const b of indexedBoxes || []) {
-        addRect(pageNo, b, blue, "indexed");
+        const ann = addRect(pageNo, b, blue, "indexed");
+        if (ann) created.push(ann);
       }
     }
   }
+  return created;
 }
 
 function collectBoxes(methodData) {
@@ -192,6 +198,30 @@ function boxesEqual(a, b) {
     }
   }
   return true;
+}
+
+function focusOnAnnotations(annotations, pageNo) {
+  if (!annotations || !annotations.length || !viewerInstance || !documentViewer) return;
+  const first = annotations[0];
+  try {
+    if (viewerInstance?.UI?.setZoomLevel) {
+      viewerInstance.UI.setZoomLevel(2);
+    } else if (documentViewer?.setZoomLevel) {
+      documentViewer.setZoomLevel(2);
+    }
+  } catch {}
+  try {
+    documentViewer.setCurrentPage?.(pageNo);
+  } catch {}
+  requestAnimationFrame(() => {
+    try {
+      if (typeof documentViewer.jumpToAnnotation === "function") {
+        documentViewer.jumpToAnnotation(first, { animate: true });
+      } else if (typeof documentViewer.scrollToAnnotation === "function") {
+        documentViewer.scrollToAnnotation(first, { animate: true });
+      }
+    } catch {}
+  });
 }
 
 function buildDocIndex(examples) {
@@ -252,7 +282,7 @@ function loadExamplesForDoc(docId) {
     exampleSelectEl.appendChild(opt);
   }
   exampleSelectEl.value = entry.examples[0]?.id || "";
-  renderExample(entry.examples[0]);
+  renderExample(entry.examples[0], { focus: true });
 }
 
 function findExampleById(id) {
@@ -263,7 +293,7 @@ function findExampleById(id) {
   return null;
 }
 
-function renderExample(ex) {
+function renderExample(ex, opts = { focus: true }) {
   if (!ex) return;
   setText(evalFieldLabelEl, ex.question);
   setText(evalExpectedValueEl, ex.expected_answer);
@@ -283,18 +313,21 @@ function renderExample(ex) {
   const docId = ex.doc_id;
   const url = `/api/eval_pdf?doc_id=${encodeURIComponent(docId)}`;
   if (!viewerInstance || !documentViewer) {
-    pendingOverlay = { gt: gtBoxes, raw: rawBoxes, indexed: indexedBoxes, page: pageNo };
+    pendingOverlay = { gt: gtBoxes, raw: rawBoxes, indexed: indexedBoxes, page: pageNo, focus: opts.focus };
     currentDocId = docId;
     return;
   }
   if (currentDocId !== docId) {
     currentDocId = docId;
-    pendingOverlay = { gt: gtBoxes, raw: rawBoxes, indexed: indexedBoxes, page: pageNo };
+    pendingOverlay = { gt: gtBoxes, raw: rawBoxes, indexed: indexedBoxes, page: pageNo, focus: opts.focus };
     try {
       viewerInstance.UI.loadDocument(url);
     } catch {}
   } else {
-    renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo);
+    const anns = renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) || [];
+    if (opts.focus) {
+      focusOnAnnotations(anns, pageNo);
+    }
   }
 }
 
@@ -351,7 +384,11 @@ async function initViewer() {
         documentViewer.setZoomLevel(1);
       }
       if (pendingOverlay) {
-        renderOverlay(pendingOverlay.gt, pendingOverlay.raw, pendingOverlay.indexed, pendingOverlay.page);
+        const anns =
+          renderOverlay(pendingOverlay.gt, pendingOverlay.raw, pendingOverlay.indexed, pendingOverlay.page) || [];
+        if (pendingOverlay.focus) {
+          focusOnAnnotations(anns, pendingOverlay.page);
+        }
         pendingOverlay = null;
       }
     });
@@ -446,23 +483,23 @@ docSearchEl?.addEventListener("input", () => applyDocFilter());
 docSelectEl?.addEventListener("change", () => loadExamplesForDoc(String(docSelectEl.value || "")));
 exampleSelectEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
-  if (ex) renderExample(ex);
+  if (ex) renderExample(ex, { focus: true });
 });
 showGtEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
-  if (ex) renderExample(ex);
+  if (ex) renderExample(ex, { focus: false });
 });
 showRawEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
-  if (ex) renderExample(ex);
+  if (ex) renderExample(ex, { focus: false });
 });
 showIndexedEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
-  if (ex) renderExample(ex);
+  if (ex) renderExample(ex, { focus: false });
 });
 mergeIdenticalEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
-  if (ex) renderExample(ex);
+  if (ex) renderExample(ex, { focus: false });
 });
 
 initViewer().then(() => loadRuns().catch(() => {})).catch(() => {});
