@@ -48,6 +48,10 @@ High-level steps:
 - Draw rectangles for corrected values
 - Export as \"CVAT for images 1.1\" (annotations.xml)
 
+In-tool instructions:
+- Open the task/job and click the \"Guide\" panel in CVAT.
+- The guide mirrors `docs/cvat-guide.md` and contains the labeling checklist.
+
 Import the export into repo JSON:
 ```bash
 python scripts\\cvat_import.py --dataset funsd --xml path\\to\\annotations.xml --out-dir data\\gt_corrections
