@@ -21,6 +21,12 @@ const metricIndexedPrecisionEl = document.getElementById("metricIndexedPrecision
 const metricIndexedRecallEl = document.getElementById("metricIndexedRecall");
 const metricIndexedPass2El = document.getElementById("metricIndexedPass2");
 
+const showGtEl = document.getElementById("showGt");
+const showRawEl = document.getElementById("showRaw");
+const showIndexedEl = document.getElementById("showIndexed");
+const mergeIdenticalEl = document.getElementById("mergeIdentical");
+const abStatusEl = document.getElementById("abStatus");
+
 let viewerInstance = null;
 let documentViewer = null;
 let annotationManager = null;
@@ -111,15 +117,38 @@ function renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) {
   const green = new Annotations.Color(126, 231, 135);
   const red = new Annotations.Color(255, 123, 114);
   const blue = new Annotations.Color(122, 162, 247);
+  const amber = new Annotations.Color(249, 226, 175);
 
-  for (const b of gtBoxes || []) {
-    addRect(pageNo, b, green, "gt");
+  const showGt = showGtEl ? showGtEl.checked : true;
+  const showRaw = showRawEl ? showRawEl.checked : true;
+  const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
+  const mergeIdentical = mergeIdenticalEl ? mergeIdenticalEl.checked : true;
+
+  const identical = boxesEqual(rawBoxes, indexedBoxes);
+  if (abStatusEl) {
+    abStatusEl.textContent = identical ? "identical" : "different";
   }
-  for (const b of rawBoxes || []) {
-    addRect(pageNo, b, red, "raw");
+
+  if (showGt) {
+    for (const b of gtBoxes || []) {
+      addRect(pageNo, b, green, "gt");
+    }
   }
-  for (const b of indexedBoxes || []) {
-    addRect(pageNo, b, blue, "indexed");
+  if (identical && mergeIdentical && showRaw && showIndexed) {
+    for (const b of rawBoxes || []) {
+      addRect(pageNo, b, amber, "same");
+    }
+  } else {
+    if (showRaw) {
+      for (const b of rawBoxes || []) {
+        addRect(pageNo, b, red, "raw");
+      }
+    }
+    if (showIndexed) {
+      for (const b of indexedBoxes || []) {
+        addRect(pageNo, b, blue, "indexed");
+      }
+    }
   }
 }
 
@@ -137,6 +166,32 @@ function collectBoxes(methodData) {
     }
   }
   return boxes;
+}
+
+function normalizeBoxes(boxes) {
+  const out = (boxes || []).map((b) =>
+    (b || []).map((v) => {
+      const num = Number(v);
+      if (!Number.isFinite(num)) return 0;
+      return Math.round(num * 100) / 100;
+    })
+  );
+  return out.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+}
+
+function boxesEqual(a, b) {
+  const aa = normalizeBoxes(a);
+  const bb = normalizeBoxes(b);
+  if (aa.length !== bb.length) return false;
+  for (let i = 0; i < aa.length; i += 1) {
+    const left = aa[i];
+    const right = bb[i];
+    if (left.length !== right.length) return false;
+    for (let j = 0; j < left.length; j += 1) {
+      if (Math.abs(left[j] - right[j]) > 0.5) return false;
+    }
+  }
+  return true;
 }
 
 function buildDocIndex(examples) {
@@ -390,6 +445,22 @@ evalRunSelectEl?.addEventListener("change", () => loadRun(String(evalRunSelectEl
 docSearchEl?.addEventListener("input", () => applyDocFilter());
 docSelectEl?.addEventListener("change", () => loadExamplesForDoc(String(docSelectEl.value || "")));
 exampleSelectEl?.addEventListener("change", () => {
+  const ex = findExampleById(String(exampleSelectEl.value || ""));
+  if (ex) renderExample(ex);
+});
+showGtEl?.addEventListener("change", () => {
+  const ex = findExampleById(String(exampleSelectEl.value || ""));
+  if (ex) renderExample(ex);
+});
+showRawEl?.addEventListener("change", () => {
+  const ex = findExampleById(String(exampleSelectEl.value || ""));
+  if (ex) renderExample(ex);
+});
+showIndexedEl?.addEventListener("change", () => {
+  const ex = findExampleById(String(exampleSelectEl.value || ""));
+  if (ex) renderExample(ex);
+});
+mergeIdenticalEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex);
 });

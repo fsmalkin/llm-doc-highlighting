@@ -66,10 +66,41 @@
               <span class="swatch method-b"></span>
               <span>Method B: Indexed (blue outline)</span>
             </div>
+            <div class="legend-row">
+              <span class="swatch method-same"></span>
+              <span>A/B identical (amber outline)</span>
+            </div>
           </div>
           <p class="muted">
             These are hollow boxes for clarity; overlap can be visually compared by alignment.
+            If A and B are identical and merge is enabled, we render a single amber outline.
           </p>
+        </div>
+
+        <div class="card">
+          <div class="label">Display</div>
+          <div class="toggle-list">
+            <label class="toggle">
+              <input id="showGt" type="checkbox" checked />
+              <span>Show ground truth</span>
+            </label>
+            <label class="toggle">
+              <input id="showRaw" type="checkbox" checked />
+              <span>Show Method A (Raw + Fuzzy)</span>
+            </label>
+            <label class="toggle">
+              <input id="showIndexed" type="checkbox" checked />
+              <span>Show Method B (Indexed)</span>
+            </label>
+            <label class="toggle">
+              <input id="mergeIdentical" type="checkbox" checked />
+              <span>Merge identical A/B into amber</span>
+            </label>
+          </div>
+          <div class="row">
+            <label>AB status</label>
+            <span id="abStatus" class="badge">-</span>
+          </div>
         </div>
 
         <div class="card">

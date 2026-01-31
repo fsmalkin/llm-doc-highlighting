@@ -2,6 +2,7 @@
   --gt: #7ee787;
   --method-a: #ff7b72;
   --method-b: #7aa2f7;
+  --method-same: #f9e2af;
 }
 
 .eval-wrap {
@@ -53,6 +54,10 @@
   color: var(--method-b);
 }
 
+.swatch.method-same {
+  color: var(--method-same);
+}
+
 .ab-grid {
   display: grid;
   grid-template-columns: 1fr repeat(4, 64px);
@@ -70,4 +75,22 @@
 
 .ab-label {
   color: var(--text);
+}
+
+.toggle-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text);
+}
+
+.toggle input {
+  accent-color: var(--accent);
 }
