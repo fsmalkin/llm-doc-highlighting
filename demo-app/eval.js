@@ -24,8 +24,6 @@ const metricIndexedPass2El = document.getElementById("metricIndexedPass2");
 const showGtEl = document.getElementById("showGt");
 const showRawEl = document.getElementById("showRaw");
 const showIndexedEl = document.getElementById("showIndexed");
-const mergeIdenticalEl = document.getElementById("mergeIdentical");
-const abStatusEl = document.getElementById("abStatus");
 const toggleABEl = document.getElementById("toggleAB");
 
 let viewerInstance = null;
@@ -123,12 +121,7 @@ function renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) {
   const showGt = showGtEl ? showGtEl.checked : true;
   const showRaw = showRawEl ? showRawEl.checked : true;
   const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
-  const mergeIdentical = mergeIdenticalEl ? mergeIdenticalEl.checked : true;
-
-  const identical = boxesEqual(rawBoxes, indexedBoxes);
-  if (abStatusEl) {
-    abStatusEl.textContent = identical ? "identical" : "different";
-  }
+  const abState = showRaw && showIndexed ? "on" : !showRaw && !showIndexed ? "off" : "partial";
 
   const created = [];
   if (showGt) {
@@ -137,12 +130,13 @@ function renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) {
       if (ann) created.push(ann);
     }
   }
-  if (identical && mergeIdentical && showRaw && showIndexed) {
-    for (const b of rawBoxes || []) {
-      const ann = addRect(pageNo, b, amber, "same");
+  if (abState === "on") {
+    const merged = dedupeBoxes([...(rawBoxes || []), ...(indexedBoxes || [])]);
+    for (const b of merged) {
+      const ann = addRect(pageNo, b, amber, "ab");
       if (ann) created.push(ann);
     }
-  } else {
+  } else if (abState === "partial") {
     if (showRaw) {
       for (const b of rawBoxes || []) {
         const ann = addRect(pageNo, b, red, "raw");
@@ -186,19 +180,17 @@ function normalizeBoxes(boxes) {
   return out.sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 }
 
-function boxesEqual(a, b) {
-  const aa = normalizeBoxes(a);
-  const bb = normalizeBoxes(b);
-  if (aa.length !== bb.length) return false;
-  for (let i = 0; i < aa.length; i += 1) {
-    const left = aa[i];
-    const right = bb[i];
-    if (left.length !== right.length) return false;
-    for (let j = 0; j < left.length; j += 1) {
-      if (Math.abs(left[j] - right[j]) > 0.5) return false;
-    }
+function dedupeBoxes(boxes) {
+  const norm = normalizeBoxes(boxes);
+  const seen = new Set();
+  const out = [];
+  for (const b of norm) {
+    const key = JSON.stringify(b);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(b);
   }
-  return true;
+  return out;
 }
 
 function syncABMaster() {
@@ -512,10 +504,6 @@ showRawEl?.addEventListener("change", () => {
   if (ex) renderExample(ex, { focus: false });
 });
 showIndexedEl?.addEventListener("change", () => {
-  const ex = findExampleById(String(exampleSelectEl.value || ""));
-  if (ex) renderExample(ex, { focus: false });
-});
-mergeIdenticalEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: false });
 });

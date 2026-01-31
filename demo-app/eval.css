@@ -2,8 +2,7 @@
   --gt: #7ee787;
   --method-a: #ff7b72;
   --method-b: #7aa2f7;
-  --method-same: #f9e2af;
-  --method-ab: #c5c9d3;
+  --method-ab: #f9e2af;
 }
 
 .eval-wrap {
@@ -64,10 +63,6 @@
 
 .swatch.method-b {
   color: var(--method-b);
-}
-
-.swatch.method-same {
-  color: var(--method-same);
 }
 
 .swatch.method-ab {
