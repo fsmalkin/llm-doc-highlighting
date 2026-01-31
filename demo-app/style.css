@@ -407,6 +407,10 @@ details summary {
   background: rgba(139, 213, 202, 0.22);
 }
 
+.cta-link {
+  cursor: pointer;
+}
+
 @media (max-width: 980px) {
   .wrap {
     grid-template-columns: 1fr;

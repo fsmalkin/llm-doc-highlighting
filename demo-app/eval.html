@@ -14,8 +14,8 @@
           <div class="kicker">Evaluation</div>
           <h1>Eval Review</h1>
           <p class="muted">
-            Browse a run, pick a document, and inspect a data point. The viewer shows ground truth vs A/B
-            method boxes.
+            Review the selected run, pick a document, and inspect a data point. The viewer shows ground truth
+            vs A/B method boxes.
           </p>
           <a class="link" href="/">Back to demo</a>
         </div>
@@ -23,14 +23,12 @@
         <div class="card">
           <div class="label">Run</div>
           <div class="row">
-            <label for="evalRunSelect">Eval run</label>
-            <select id="evalRunSelect">
-              <option value="">Loading runs...</option>
-            </select>
+            <label>Selected run</label>
+            <div id="evalRunName" class="answer">-</div>
           </div>
           <div class="muted" id="evalRunMeta">-</div>
           <div class="row">
-            <a class="link" href="/stats.html">View run statistics</a>
+            <a class="link" href="/stats.html">Change run</a>
           </div>
         </div>
 

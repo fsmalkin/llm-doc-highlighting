@@ -1,5 +1,6 @@
 const statsRunSelectEl = document.getElementById("statsRunSelect");
 const statsRunMetaEl = document.getElementById("statsRunMeta");
+const openEvalLinkEl = document.getElementById("openEvalLink");
 
 const metaDatasetEl = document.getElementById("metaDataset");
 const metaSplitEl = document.getElementById("metaSplit");
@@ -101,6 +102,9 @@ async function loadRuns() {
     opt.value = "";
     opt.textContent = "No runs found";
     statsRunSelectEl.appendChild(opt);
+    if (openEvalLinkEl) {
+      openEvalLinkEl.href = "/eval.html";
+    }
     return;
   }
   for (const name of runs) {
@@ -118,6 +122,9 @@ async function loadRun(name) {
   const data = await getJson(`/api/eval_run?name=${encodeURIComponent(name)}`);
   const meta = data?.meta || {};
   setText(statsRunMetaEl, `dataset ${meta.dataset} | split ${meta.split} | samples ${meta.sample_size}`);
+  if (openEvalLinkEl) {
+    openEvalLinkEl.href = `/eval.html?run=${encodeURIComponent(name)}`;
+  }
   setText(metaDatasetEl, meta.dataset);
   setText(metaSplitEl, meta.split);
   setText(metaSamplesEl, meta.sample_size);

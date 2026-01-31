@@ -1,7 +1,7 @@
 const DEFAULT_DOC = "./assets/Physician_Report_Scanned-ocr.pdf";
 
-const evalRunSelectEl = document.getElementById("evalRunSelect");
 const evalRunMetaEl = document.getElementById("evalRunMeta");
+const evalRunNameEl = document.getElementById("evalRunName");
 const docSearchEl = document.getElementById("docSearch");
 const docSelectEl = document.getElementById("docSelect");
 const exampleSelectEl = document.getElementById("exampleSelect");
@@ -369,25 +369,23 @@ function renderExample(ex, opts = { focus: true }) {
   }
 }
 
-async function loadRuns() {
-  const data = await getJson("/api/eval_runs");
-  const runs = data?.runs || [];
-  evalRunSelectEl.innerHTML = "";
-  if (!runs.length) {
-    const opt = document.createElement("option");
-    opt.value = "";
-    opt.textContent = "No runs found";
-    evalRunSelectEl.appendChild(opt);
-    return;
+function getRunFromUrl() {
+  const params = new URLSearchParams(window.location.search || "");
+  return params.get("run") || "";
+}
+
+function setRunEmptyState() {
+  setText(evalRunNameEl, "No run selected");
+  setText(evalRunMetaEl, "Choose a run on the Stats page to begin.");
+  docSelectEl.innerHTML = "";
+  exampleSelectEl.innerHTML = "";
+  if (docListEl) {
+    docListEl.innerHTML = "";
+    const empty = document.createElement("div");
+    empty.className = "doc-item empty";
+    empty.textContent = "No run loaded";
+    docListEl.appendChild(empty);
   }
-  for (const name of runs) {
-    const opt = document.createElement("option");
-    opt.value = name;
-    opt.textContent = name;
-    evalRunSelectEl.appendChild(opt);
-  }
-  evalRunSelectEl.value = runs[0];
-  await loadRun(runs[0]);
 }
 
 async function loadRun(name) {
@@ -398,6 +396,7 @@ async function loadRun(name) {
   const metaText = [`dataset ${meta.dataset}`, `split ${meta.split}`, `samples ${meta.sample_size}`]
     .filter(Boolean)
     .join(" | ");
+  setText(evalRunNameEl, name);
   setText(evalRunMetaEl, metaText || "-");
 
   buildDocIndex(data?.examples || []);
@@ -516,7 +515,6 @@ async function initViewer() {
   }
 }
 
-evalRunSelectEl?.addEventListener("change", () => loadRun(String(evalRunSelectEl.value || "")));
 docSearchEl?.addEventListener("input", () => applyDocFilter());
 docSelectEl?.addEventListener("change", () => loadExamplesForDoc(String(docSelectEl.value || "")));
 exampleSelectEl?.addEventListener("change", () => {
@@ -544,4 +542,13 @@ toggleABEl?.addEventListener("change", () => {
   if (ex) renderExample(ex, { focus: false });
 });
 
-initViewer().then(() => loadRuns().catch(() => {})).catch(() => {});
+initViewer()
+  .then(() => {
+    const run = getRunFromUrl();
+    if (!run) {
+      setRunEmptyState();
+      return null;
+    }
+    return loadRun(run).catch(() => setRunEmptyState());
+  })
+  .catch(() => {});
