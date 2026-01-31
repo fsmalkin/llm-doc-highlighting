@@ -284,7 +284,9 @@ def _normalize_poly(poly_abs: List[List[float]], pw: float, ph: float) -> List[L
 def _build_system_prompt(value_type: str, prompt_mode: str) -> str:
     extra_rule = ""
     if prompt_mode == "field_label":
-        extra_rule = "- The provided label is a field key; return the corresponding field value text, not the label."
+        extra_rule = (
+            "- You will be given a form field label; find that label in the document and return the corresponding field value text, not the label."
+        )
     return "\n".join(
         [
             'You are given a "reading view" where each line starts with its global_line_no (0-based) followed by a tab and the text.',
@@ -320,7 +322,8 @@ def _build_user_prompt(prompt_mode: str, query: str, reading_view_text: str) -> 
                 query,
                 "",
                 "Task:",
-                "Find the corresponding field value in the document and return the minimal complete value span.",
+                "We will give you the name of a form field label. Find that label in the document and extract the value for the field.",
+                "Return the minimal complete value span (value only).",
                 "",
                 "Reading view:",
                 reading_view_text,

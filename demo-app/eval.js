@@ -301,6 +301,22 @@ function syncABMaster() {
 function focusOnAnnotations(annotations, pageNo) {
   if (!annotations || !annotations.length || !viewerInstance || !documentViewer) return;
   const first = annotations[0];
+  const rect = annotations.reduce(
+    (acc, ann) => {
+      const x0 = Number(ann?.X ?? 0);
+      const y0 = Number(ann?.Y ?? 0);
+      const x1 = x0 + Number(ann?.Width ?? 0);
+      const y1 = y0 + Number(ann?.Height ?? 0);
+      if (!acc) return { x0, y0, x1, y1 };
+      return {
+        x0: Math.min(acc.x0, x0),
+        y0: Math.min(acc.y0, y0),
+        x1: Math.max(acc.x1, x1),
+        y1: Math.max(acc.y1, y1),
+      };
+    },
+    null
+  );
   try {
     if (viewerInstance?.UI?.setZoomLevel) {
       viewerInstance.UI.setZoomLevel(2);
@@ -315,10 +331,16 @@ function focusOnAnnotations(annotations, pageNo) {
     try {
       if (typeof documentViewer.jumpToAnnotation === "function") {
         documentViewer.jumpToAnnotation(first, { animate: true });
+        return;
       } else if (typeof documentViewer.scrollToAnnotation === "function") {
         documentViewer.scrollToAnnotation(first, { animate: true });
+        return;
       }
     } catch {}
+    if (rect && Core?.Math?.Rect && typeof documentViewer.setViewRect === "function") {
+      const viewRect = new Core.Math.Rect(rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0);
+      documentViewer.setViewRect(viewRect, true, true);
+    }
   });
 }
 
@@ -345,7 +367,9 @@ function focusByTag(tag) {
     anns = getAnnotationsByTag(tag);
   }
   if (!anns.length) {
+    const ex = findExampleById(String(exampleSelectEl?.value || ""));
     pendingFocusTag = tag;
+    if (ex) renderExample(ex, { focus: false });
     return;
   }
   const pageNo = anns[0]?.PageNumber || 1;
