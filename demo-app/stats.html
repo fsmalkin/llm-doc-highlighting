@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Doc Highlighting - Eval Stats</title>
+    <link rel="stylesheet" href="./style.css" />
+    <link rel="stylesheet" href="./stats.css" />
+  </head>
+  <body>
+    <div class="wrap stats-wrap">
+      <aside class="panel">
+        <div class="panel-header">
+          <div class="kicker">Evaluation</div>
+          <h1>Eval Statistics</h1>
+          <p class="muted">
+            Aggregate results for a single run. Use these stats to compare methods before scaling.
+          </p>
+          <a class="link" href="/eval.html">Back to Eval Review</a>
+        </div>
+
+        <div class="card">
+          <div class="label">Run</div>
+          <div class="row">
+            <label for="statsRunSelect">Eval run</label>
+            <select id="statsRunSelect">
+              <option value="">Loading runs...</option>
+            </select>
+          </div>
+          <div class="muted" id="statsRunMeta">-</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Run metadata</div>
+          <div class="meta-grid">
+            <div class="meta-label">Dataset</div>
+            <div id="metaDataset" class="meta-value">-</div>
+            <div class="meta-label">Split</div>
+            <div id="metaSplit" class="meta-value">-</div>
+            <div class="meta-label">Samples</div>
+            <div id="metaSamples" class="meta-value">-</div>
+            <div class="meta-label">Prompt mode</div>
+            <div id="metaPrompt" class="meta-value">-</div>
+            <div class="meta-label">Value type</div>
+            <div id="metaValueType" class="meta-value">-</div>
+            <div class="meta-label">Model</div>
+            <div id="metaModel" class="meta-value">-</div>
+          </div>
+        </div>
+      </aside>
+
+      <main class="stats-main">
+        <div class="stats-grid">
+          <div class="card">
+            <div class="label">Method A - Raw + Fuzzy</div>
+            <div class="stats-cards">
+              <div class="stat">
+                <div class="stat-label">Span validity</div>
+                <div id="rawSpanValid" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Mapping success</div>
+                <div id="rawMapping" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg word IoU</div>
+                <div id="rawIoU" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg precision</div>
+                <div id="rawPrecision" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg recall</div>
+                <div id="rawRecall" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Pass2 rate</div>
+                <div id="rawPass2" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg latency</div>
+                <div id="rawLatency" class="stat-value">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="label">Method B - Indexed</div>
+            <div class="stats-cards">
+              <div class="stat">
+                <div class="stat-label">Span validity</div>
+                <div id="idxSpanValid" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Mapping success</div>
+                <div id="idxMapping" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg word IoU</div>
+                <div id="idxIoU" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg precision</div>
+                <div id="idxPrecision" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg recall</div>
+                <div id="idxRecall" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Pass2 rate</div>
+                <div id="idxPass2" class="stat-value">-</div>
+              </div>
+              <div class="stat">
+                <div class="stat-label">Avg latency</div>
+                <div id="idxLatency" class="stat-value">-</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="label">Notes</div>
+          <p class="muted">
+            These stats reflect averages across the selected run. If you want distribution charts or
+            per‑document breakdowns, we can add those next.
+          </p>
+        </div>
+      </main>
+    </div>
+
+    <script src="./stats.js"></script>
+  </body>
+</html>

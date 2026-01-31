@@ -88,6 +88,40 @@
   color: var(--text);
 }
 
+.doc-list {
+  display: grid;
+  gap: 6px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.doc-item {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.doc-item.active {
+  border-color: rgba(122, 162, 247, 0.7);
+  background: rgba(122, 162, 247, 0.15);
+}
+
+.doc-item.empty {
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: default;
+}
+
 .switch {
   position: relative;
   display: inline-block;

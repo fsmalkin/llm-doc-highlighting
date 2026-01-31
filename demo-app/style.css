@@ -398,6 +398,15 @@ details summary {
   background: rgba(122, 162, 247, 0.25);
 }
 
+.cta-link.secondary {
+  border-color: rgba(139, 213, 202, 0.7);
+  background: rgba(139, 213, 202, 0.12);
+}
+
+.cta-link.secondary:hover {
+  background: rgba(139, 213, 202, 0.22);
+}
+
 @media (max-width: 980px) {
   .wrap {
     grid-template-columns: 1fr;

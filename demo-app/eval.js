@@ -5,6 +5,7 @@ const evalRunMetaEl = document.getElementById("evalRunMeta");
 const docSearchEl = document.getElementById("docSearch");
 const docSelectEl = document.getElementById("docSelect");
 const exampleSelectEl = document.getElementById("exampleSelect");
+const docListEl = document.getElementById("docList");
 
 const evalFieldLabelEl = document.getElementById("evalFieldLabel");
 const evalExpectedValueEl = document.getElementById("evalExpectedValue");
@@ -252,6 +253,7 @@ function applyDocFilter() {
     ? docIndex.filter((d) => d.docId.toLowerCase().includes(term))
     : docIndex.slice();
   docSelectEl.innerHTML = "";
+  if (docListEl) docListEl.innerHTML = "";
   if (!items.length) {
     const opt = document.createElement("option");
     opt.value = "";
@@ -262,6 +264,12 @@ function applyDocFilter() {
     opt2.value = "";
     opt2.textContent = "Select a document";
     exampleSelectEl.appendChild(opt2);
+    if (docListEl) {
+      const empty = document.createElement("div");
+      empty.className = "doc-item empty";
+      empty.textContent = "No documents match";
+      docListEl.appendChild(empty);
+    }
     return;
   }
   for (const item of items) {
@@ -270,6 +278,20 @@ function applyDocFilter() {
     opt.textContent = `${item.docId} (${item.examples.length})`;
     docSelectEl.appendChild(opt);
   }
+  if (docListEl) {
+    for (const item of items) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "doc-item";
+      btn.dataset.docId = item.docId;
+      btn.textContent = `${item.docId} (${item.examples.length})`;
+      btn.addEventListener("click", () => {
+        docSelectEl.value = item.docId;
+        loadExamplesForDoc(item.docId);
+      });
+      docListEl.appendChild(btn);
+    }
+  }
   docSelectEl.value = items[0].docId;
   loadExamplesForDoc(items[0].docId);
 }
@@ -277,6 +299,12 @@ function applyDocFilter() {
 function loadExamplesForDoc(docId) {
   const entry = docIndex.find((d) => d.docId === docId);
   exampleSelectEl.innerHTML = "";
+  if (docListEl) {
+    const items = Array.from(docListEl.querySelectorAll(".doc-item"));
+    for (const item of items) {
+      item.classList.toggle("active", item.dataset.docId === docId);
+    }
+  }
   if (!entry) {
     const opt = document.createElement("option");
     opt.value = "";
