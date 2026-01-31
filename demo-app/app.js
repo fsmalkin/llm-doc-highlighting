@@ -50,6 +50,7 @@ let mode = "raw";
 let evalRunData = null;
 let evalCurrentDoc = "demo";
 let evalPendingOverlay = null;
+let evalNeedsRender = false;
 
 function setStatus(msg, kind) {
   statusEl.textContent = String(msg || "");
@@ -686,7 +687,11 @@ function renderEvalExample() {
   const predBoxes = collectPredBoxes(methodData);
   const pageNo = methodData?.mapped?.pages?.[0]?.page || 1;
   const docId = ex.doc_id;
-  if (!viewerInstance || !documentViewer) return;
+  if (!viewerInstance || !documentViewer) {
+    evalNeedsRender = true;
+    return;
+  }
+  evalNeedsRender = false;
   const url = `/api/eval_pdf?doc_id=${encodeURIComponent(docId)}`;
   if (evalCurrentDoc !== docId) {
     evalCurrentDoc = docId;
@@ -850,7 +855,13 @@ setDebug(null);
 setMode("raw");
 
 initViewer()
-  .then(() => setStatus("Viewer ready.", "ok"))
+  .then(() => {
+    setStatus("Viewer ready.", "ok");
+    if (evalNeedsRender) {
+      renderEvalExample();
+    }
+    return loadEvalRuns().catch(() => {});
+  })
   .catch((err) => setStatus(`Viewer failed: ${err.message}`, "bad"));
 
 refreshStatus().then((status) => {
@@ -858,5 +869,3 @@ refreshStatus().then((status) => {
     ensurePrepared().catch(() => {});
   }
 });
-
-loadEvalRuns().catch(() => {});
