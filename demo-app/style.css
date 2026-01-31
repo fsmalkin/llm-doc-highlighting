@@ -273,6 +273,10 @@ button:disabled {
   color: #dbe4ff;
 }
 
+.type-indicator[hidden] {
+  display: none;
+}
+
 .source {
   font-size: 12px;
   line-height: 1.4;

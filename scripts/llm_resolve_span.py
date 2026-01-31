@@ -307,12 +307,18 @@ def _build_system_prompt(value_type: str) -> str:
     )
 
 
-def _tool_schema_citation() -> Dict[str, Any]:
+def _allowed_value_types(value_type_req: str) -> List[str]:
+    if str(value_type_req).strip().lower() == "auto":
+        return [vt for vt in VALUE_TYPES if vt.lower() != "auto"]
+    return [value_type_req]
+
+
+def _tool_schema_citation(value_type_req: str) -> Dict[str, Any]:
     return {
         "type": "object",
         "properties": {
             "answer": {"type": "string"},
-            "value_type": {"type": "string", "enum": VALUE_TYPES},
+            "value_type": {"type": "string", "enum": _allowed_value_types(value_type_req)},
             "source": {"type": "string"},
             "citations": {
                 "type": "array",
@@ -384,12 +390,13 @@ def main() -> None:
     ]
     temp = None if _is_gpt5_model(model) else 0
     tool_name = "return_span_citation"
+    tool_schema = _tool_schema_citation(value_type_req)
     obj = _call_openai_tool(
         messages=messages,
         model=model,
         temperature=temp,
         tool_name=tool_name,
-        tool_schema=_tool_schema_citation(),
+        tool_schema=tool_schema,
     )
     trace = None
     if args.trace:
@@ -400,7 +407,7 @@ def main() -> None:
                 "base_url": _openai_base_url(),
                 "messages": messages,
                 "tool_name": tool_name,
-                "tool_schema": _tool_schema_citation(),
+                "tool_schema": tool_schema,
             },
             "response": obj,
         }

@@ -413,12 +413,18 @@ def _build_pass2_prompt(question: str, indexed_window: str, value_type: str) -> 
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
-def _tool_schema_pass1() -> Dict[str, Any]:
+def _allowed_value_types(value_type_req: str) -> List[str]:
+    if str(value_type_req).strip().lower() == "auto":
+        return [vt for vt in VALUE_TYPES if vt.lower() != "auto"]
+    return [value_type_req]
+
+
+def _tool_schema_pass1(value_type_req: str) -> Dict[str, Any]:
     return {
         "type": "object",
         "properties": {
             "answer": {"type": "string"},
-            "value_type": {"type": "string", "enum": VALUE_TYPES},
+            "value_type": {"type": "string", "enum": _allowed_value_types(value_type_req)},
             "raw": {"type": "string"},
             "raw_extra": {"type": "string"},
         },
@@ -426,12 +432,12 @@ def _tool_schema_pass1() -> Dict[str, Any]:
     }
 
 
-def _tool_schema_pass2() -> Dict[str, Any]:
+def _tool_schema_pass2(value_type_req: str) -> Dict[str, Any]:
     return {
         "type": "object",
         "properties": {
             "answer": {"type": "string"},
-            "value_type": {"type": "string", "enum": VALUE_TYPES},
+            "value_type": {"type": "string", "enum": _allowed_value_types(value_type_req)},
             "source": {"type": "string"},
             "citations": {
                 "type": "array",
@@ -632,12 +638,13 @@ def main() -> None:
     pass1_msgs = _build_pass1_prompt(str(args.query).strip(), flat_text, value_type_req)
     temp1 = None if _is_gpt5_model(model_pass1) else 0
     tool_name_pass1 = "return_raw_span"
+    tool_schema_pass1 = _tool_schema_pass1(value_type_req)
     pass1_obj = _call_openai_tool(
         messages=pass1_msgs,
         model=model_pass1,
         temperature=temp1,
         tool_name=tool_name_pass1,
-        tool_schema=_tool_schema_pass1(),
+        tool_schema=tool_schema_pass1,
     )
 
     answer = str(pass1_obj.get("answer") or "")
@@ -655,7 +662,7 @@ def main() -> None:
                 "temperature": temp1,
                 "messages": pass1_msgs,
                 "tool_name": tool_name_pass1,
-                "tool_schema": _tool_schema_pass1(),
+                "tool_schema": tool_schema_pass1,
             },
             "response": pass1_obj,
         }
@@ -694,12 +701,13 @@ def main() -> None:
         pass2_msgs = _build_pass2_prompt(str(args.query).strip(), indexed_window, value_type_req)
         temp2 = None if _is_gpt5_model(model_pass2) else 0
         tool_name_pass2 = "return_indexed_span"
+        tool_schema_pass2 = _tool_schema_pass2(value_type_req)
         pass2_obj = _call_openai_tool(
             messages=pass2_msgs,
             model=model_pass2,
             temperature=temp2,
             tool_name=tool_name_pass2,
-            tool_schema=_tool_schema_pass2(),
+            tool_schema=tool_schema_pass2,
         )
         used_pass2 = True
 
@@ -725,7 +733,7 @@ def main() -> None:
                     "temperature": temp2,
                     "messages": pass2_msgs,
                     "tool_name": tool_name_pass2,
-                    "tool_schema": _tool_schema_pass2(),
+                    "tool_schema": tool_schema_pass2,
                 },
                 "response": pass2_obj,
                 "window": {"start_token": window_start, "end_token": window_end},
