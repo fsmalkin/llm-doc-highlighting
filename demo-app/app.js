@@ -24,6 +24,17 @@ const statusDetailsEl = document.getElementById("statusDetails");
 const tabIndexedEl = document.getElementById("tabIndexed");
 const tabRawEl = document.getElementById("tabRaw");
 
+const evalRunEl = document.getElementById("evalRun");
+const evalExampleEl = document.getElementById("evalExample");
+const evalMethodEl = document.getElementById("evalMethod");
+const evalIoUEl = document.getElementById("evalIoU");
+const evalPrecisionEl = document.getElementById("evalPrecision");
+const evalRecallEl = document.getElementById("evalRecall");
+const evalPass2El = document.getElementById("evalPass2");
+const evalLabelEl = document.getElementById("evalLabel");
+const evalExpectedEl = document.getElementById("evalExpected");
+const evalAnswerEl = document.getElementById("evalAnswer");
+
 const btnAsk = document.getElementById("btnAsk");
 const btnClear = document.getElementById("btnClear");
 
@@ -36,6 +47,9 @@ let cacheReady = false;
 let preparing = false;
 let preparePromise = null;
 let mode = "raw";
+let evalRunData = null;
+let evalCurrentDoc = "demo";
+let evalPendingOverlay = null;
 
 function setStatus(msg, kind) {
   statusEl.textContent = String(msg || "");
@@ -98,6 +112,13 @@ function setDebug(obj) {
 }
 
 function setBadge(el, text, kind) {
+  if (!el) return;
+  el.textContent = text || "-";
+  el.classList.remove("good", "bad", "warn");
+  if (kind) el.classList.add(kind);
+}
+
+function setEvalBadge(el, text, kind) {
   if (!el) return;
   el.textContent = text || "-";
   el.classList.remove("good", "bad", "warn");
@@ -287,6 +308,18 @@ function clearHighlights() {
   }
 }
 
+function clearEvalOverlays() {
+  if (!annotationManager) return;
+  const existing = annotationManager.getAnnotationsList?.() || [];
+  for (const a of existing) {
+    try {
+      if (a?.getCustomData?.("eval_hl") === "1") {
+        annotationManager.deleteAnnotation?.(a, false, true);
+      }
+    } catch {}
+  }
+}
+
 function renderHighlights(pages) {
   if (!annotationManager || !Annotations || !Core) return null;
   clearHighlights();
@@ -343,6 +376,73 @@ function renderHighlights(pages) {
   return { firstAnn, pages: pagesSorted };
 }
 
+function addRectAnnotation(pageNo, bbox, color, opacity, tag) {
+  if (!annotationManager || !Annotations) return null;
+  const nums = (bbox || []).map((v) => Number(v));
+  if (nums.length !== 4 || nums.some((v) => Number.isNaN(v))) return null;
+  let [x0, y0, x1, y1] = nums;
+  if (x0 > x1) [x0, x1] = [x1, x0];
+  if (y0 > y1) [y0, y1] = [y1, y0];
+  const rect = new Annotations.RectangleAnnotation();
+  rect.PageNumber = Number(pageNo || 1);
+  rect.X = x0;
+  rect.Y = y0;
+  rect.Width = Math.max(0.5, x1 - x0);
+  rect.Height = Math.max(0.5, y1 - y0);
+  rect.StrokeColor = color;
+  rect.FillColor = color;
+  rect.Opacity = opacity;
+  rect.setCustomData?.("eval_hl", "1");
+  rect.setCustomData?.("eval_tag", tag || "");
+  annotationManager.addAnnotation(rect);
+  annotationManager.redrawAnnotation(rect);
+  return rect;
+}
+
+function intersectBox(a, b) {
+  const [ax0, ay0, ax1, ay1] = a;
+  const [bx0, by0, bx1, by1] = b;
+  const x0 = Math.max(ax0, bx0);
+  const y0 = Math.max(ay0, by0);
+  const x1 = Math.min(ax1, bx1);
+  const y1 = Math.min(ay1, by1);
+  if (x1 <= x0 || y1 <= y0) return null;
+  return [x0, y0, x1, y1];
+}
+
+function renderEvalOverlays(gtBoxes, predBoxes, pageNo) {
+  if (!annotationManager || !Annotations) return;
+  clearHighlights();
+  clearEvalOverlays();
+  const green = new Annotations.Color(122, 231, 135);
+  const blue = new Annotations.Color(122, 162, 247);
+  const teal = new Annotations.Color(139, 213, 202);
+
+  for (const b of gtBoxes || []) {
+    addRectAnnotation(pageNo, b, green, 0.15, "gt");
+  }
+  for (const b of predBoxes || []) {
+    addRectAnnotation(pageNo, b, blue, 0.18, "pred");
+  }
+  for (const pb of predBoxes || []) {
+    let best = null;
+    let bestArea = 0;
+    for (const gb of gtBoxes || []) {
+      const inter = intersectBox(pb, gb);
+      if (inter) {
+        const area = (inter[2] - inter[0]) * (inter[3] - inter[1]);
+        if (area > bestArea) {
+          bestArea = area;
+          best = inter;
+        }
+      }
+    }
+    if (best) {
+      addRectAnnotation(pageNo, best, teal, 0.28, "overlap");
+    }
+  }
+}
+
 async function initViewer() {
   const webviewerPath = new URL("/webviewer", window.location.href).href.replace(/\/$/, "");
   const initialDoc = new URL(DEFAULT_DOC, window.location.href).href;
@@ -368,6 +468,10 @@ async function initViewer() {
         UI.setZoomLevel(1);
       } else if (documentViewer?.setZoomLevel) {
         documentViewer.setZoomLevel(1);
+      }
+      if (evalPendingOverlay) {
+        renderEvalOverlays(evalPendingOverlay.gt, evalPendingOverlay.pred, evalPendingOverlay.page);
+        evalPendingOverlay = null;
       }
     });
   }
@@ -462,6 +566,138 @@ async function initViewer() {
         "annotationStylePopup",
       ]);
     } catch {}
+  }
+}
+
+function setEvalText(el, text) {
+  if (!el) return;
+  el.textContent = text ? String(text) : "-";
+}
+
+function setEvalMetrics(metrics) {
+  const iou = Number(metrics?.word_iou);
+  const precision = Number(metrics?.precision);
+  const recall = Number(metrics?.recall);
+  const pass2 = metrics?.used_pass2;
+  setEvalBadge(evalIoUEl, Number.isFinite(iou) ? iou.toFixed(2) : "-", "good");
+  setEvalBadge(evalPrecisionEl, Number.isFinite(precision) ? precision.toFixed(2) : "-", "good");
+  setEvalBadge(evalRecallEl, Number.isFinite(recall) ? recall.toFixed(2) : "-", "good");
+  if (pass2 == null) {
+    setEvalBadge(evalPass2El, "-", "warn");
+  } else {
+    setEvalBadge(evalPass2El, pass2 ? "yes" : "no", pass2 ? "warn" : "good");
+  }
+}
+
+async function loadEvalRuns() {
+  try {
+    const data = await getJson("/api/eval_runs");
+    const runs = data?.runs || [];
+    evalRunEl.innerHTML = "";
+    if (!runs.length) {
+      const opt = document.createElement("option");
+      opt.value = "";
+      opt.textContent = "No runs found";
+      evalRunEl.appendChild(opt);
+      return;
+    }
+    for (const name of runs) {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      evalRunEl.appendChild(opt);
+    }
+    evalRunEl.value = runs[0];
+    await loadEvalRun(runs[0]);
+  } catch (err) {
+    evalRunEl.innerHTML = "";
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "Eval runs unavailable";
+    evalRunEl.appendChild(opt);
+  }
+}
+
+async function loadEvalRun(name) {
+  if (!name) return;
+  const data = await getJson(`/api/eval_run?name=${encodeURIComponent(name)}`);
+  evalRunData = data;
+  const examples = data?.examples || [];
+  evalExampleEl.innerHTML = "";
+  if (!examples.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No examples";
+    evalExampleEl.appendChild(opt);
+    return;
+  }
+  for (const ex of examples) {
+    const opt = document.createElement("option");
+    opt.value = ex.id;
+    opt.textContent = `${ex.doc_id} • ${ex.question}`;
+    evalExampleEl.appendChild(opt);
+  }
+  evalExampleEl.value = examples[0].id;
+  renderEvalExample();
+}
+
+function pickExample() {
+  const id = String(evalExampleEl?.value || "");
+  if (!evalRunData || !id) return null;
+  const exs = evalRunData.examples || [];
+  return exs.find((e) => e.id === id) || null;
+}
+
+function collectPredBoxes(methodData) {
+  const pages = methodData?.mapped?.pages || [];
+  const boxes = [];
+  for (const pg of pages) {
+    const quads = pg?.word_quads_abs || [];
+    for (const q of quads) {
+      const nums = (q || []).map((v) => Number(v));
+      if (nums.length !== 8 || nums.some((v) => Number.isNaN(v))) continue;
+      const xs = [nums[0], nums[2], nums[4], nums[6]];
+      const ys = [nums[1], nums[3], nums[5], nums[7]];
+      boxes.push([Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]);
+    }
+  }
+  return boxes;
+}
+
+function renderEvalExample() {
+  const ex = pickExample();
+  if (!ex) {
+    setEvalText(evalLabelEl, "-");
+    setEvalText(evalExpectedEl, "-");
+    setEvalText(evalAnswerEl, "-");
+    setEvalMetrics(null);
+    clearEvalOverlays();
+    return;
+  }
+  const method = String(evalMethodEl?.value || "raw");
+  const methodData = ex.methods?.[method] || {};
+  const metrics = methodData?.metrics || {};
+  setEvalText(evalLabelEl, ex.question);
+  setEvalText(evalExpectedEl, ex.expected_answer);
+  setEvalText(evalAnswerEl, methodData?.answer || methodData?.error || "-");
+  setEvalMetrics(metrics);
+
+  const gtBoxes = (ex.expected_words || []).map((w) => w.box).filter(Boolean);
+  const predBoxes = collectPredBoxes(methodData);
+  const pageNo = methodData?.mapped?.pages?.[0]?.page || 1;
+  const docId = ex.doc_id;
+  if (!viewerInstance || !documentViewer) return;
+  const url = `/api/eval_pdf?doc_id=${encodeURIComponent(docId)}`;
+  if (evalCurrentDoc !== docId) {
+    evalCurrentDoc = docId;
+    evalPendingOverlay = { gt: gtBoxes, pred: predBoxes, page: pageNo };
+    try {
+      viewerInstance.UI.loadDocument(url);
+    } catch {
+      evalPendingOverlay = null;
+    }
+  } else {
+    renderEvalOverlays(gtBoxes, predBoxes, pageNo);
   }
 }
 
@@ -597,6 +833,12 @@ promptPresetEl?.addEventListener("change", () => {
   questionEl.value = nextValue;
   questionEl.focus();
 });
+evalRunEl?.addEventListener("change", () => {
+  const val = String(evalRunEl.value || "");
+  if (val) loadEvalRun(val);
+});
+evalExampleEl?.addEventListener("change", () => renderEvalExample());
+evalMethodEl?.addEventListener("change", () => renderEvalExample());
 
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");
@@ -616,3 +858,5 @@ refreshStatus().then((status) => {
     ensurePrepared().catch(() => {});
   }
 });
+
+loadEvalRuns().catch(() => {});

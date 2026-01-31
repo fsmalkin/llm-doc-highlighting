@@ -91,3 +91,7 @@ python scripts\funsd_eval.py --split test --limit 10 --compare --prompt-mode fie
 Outputs:
 - `reports/funsd/run_<timestamp>.json` (summary + per-example data)
 - `reports/funsd/runs/` (per-example resolver outputs)
+
+Review in the demo UI:
+- Start the demo server (`python scripts\demo_server.py`)
+- Open http://127.0.0.1:8000/ and use the Eval Review panel to select a run and example.

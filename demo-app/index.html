@@ -62,6 +62,59 @@
         </div>
 
         <div class="card">
+          <div class="label">Eval review</div>
+          <div class="row">
+            <label for="evalRun">Run</label>
+            <select id="evalRun">
+              <option value="">Loading runs...</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="evalExample">Example</label>
+            <select id="evalExample">
+              <option value="">Select a run first</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="evalMethod">Method</label>
+            <select id="evalMethod">
+              <option value="raw" selected>Raw + Fuzzy</option>
+              <option value="indexed">Indexed</option>
+            </select>
+          </div>
+          <div class="eval-metrics">
+            <div class="metric">
+              <span class="metric-label">Word IoU</span>
+              <span id="evalIoU" class="badge">-</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Precision</span>
+              <span id="evalPrecision" class="badge">-</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Recall</span>
+              <span id="evalRecall" class="badge">-</span>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Pass2</span>
+              <span id="evalPass2" class="badge">-</span>
+            </div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Field label</div>
+            <div id="evalLabel" class="answer">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Expected value</div>
+            <div id="evalExpected" class="answer">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Model answer</div>
+            <div id="evalAnswer" class="answer">-</div>
+          </div>
+        </div>
+
+        <div class="card">
           <div class="tabs">
             <button id="tabRaw" class="tab active" data-mode="raw">Raw + Fuzzy</button>
             <button id="tabIndexed" class="tab" data-mode="indexed">Indexed</button>

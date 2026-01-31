@@ -31,6 +31,8 @@ PDF_PATH = DEMO_ROOT / "assets" / "Physician_Report_Scanned-ocr.pdf"
 CACHE_ROOT = REPO_ROOT / "cache"
 ARTIFACTS_ROOT = REPO_ROOT / "artifacts" / "demo"
 DEFAULT_MODEL = "gpt-5-mini"
+REPORTS_ROOT = REPO_ROOT / "reports" / "funsd"
+FUNSD_PDF_ROOT = REPO_ROOT / "data" / "funsd" / "pdf"
 
 
 def _load_env(dotenv_paths: list[pathlib.Path]) -> None:
@@ -258,6 +260,15 @@ class DemoHandler(SimpleHTTPRequestHandler):
         if raw_path == "/api/status":
             self._handle_status()
             return
+        if raw_path == "/api/eval_runs":
+            self._handle_eval_runs()
+            return
+        if raw_path == "/api/eval_run":
+            self._handle_eval_run()
+            return
+        if raw_path == "/api/eval_pdf":
+            self._handle_eval_pdf()
+            return
         if raw_path.startswith("/api/"):
             self._send_json({"ok": False, "error": "Use POST"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
             return
@@ -306,6 +317,17 @@ class DemoHandler(SimpleHTTPRequestHandler):
         data = json.dumps(payload, ensure_ascii=True).encode("utf-8")
         self.send_response(status.value)
         self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
+
+    def _send_file(self, path: pathlib.Path, *, content_type: str) -> None:
+        if not path.exists() or not path.is_file():
+            self._send_json({"ok": False, "error": "File not found"}, status=HTTPStatus.NOT_FOUND)
+            return
+        data = path.read_bytes()
+        self.send_response(HTTPStatus.OK.value)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(data)))
         self.end_headers()
         self.wfile.write(data)
@@ -374,6 +396,45 @@ class DemoHandler(SimpleHTTPRequestHandler):
                     "vision_credentials_present": creds_present,
                 }
             )
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_eval_runs(self) -> None:
+        try:
+            runs: list[str] = []
+            if REPORTS_ROOT.exists():
+                runs = sorted([p.name for p in REPORTS_ROOT.glob("run_*.json")], reverse=True)
+            self._send_json({"ok": True, "runs": runs})
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_eval_run(self) -> None:
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query or "")
+            name = params.get("name", [""])[0].strip()
+            if not name or "/" in name or "\\" in name:
+                self._send_json({"ok": False, "error": "Invalid run name"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            path = REPORTS_ROOT / name
+            if not path.exists():
+                self._send_json({"ok": False, "error": "Run not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            self._send_json(payload)
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_eval_pdf(self) -> None:
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query or "")
+            doc_id = params.get("doc_id", [""])[0].strip()
+            if not doc_id or "/" in doc_id or "\\" in doc_id:
+                self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            pdf_path = FUNSD_PDF_ROOT / f"{doc_id}.pdf"
+            self._send_file(pdf_path, content_type="application/pdf")
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
