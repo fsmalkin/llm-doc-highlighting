@@ -221,6 +221,22 @@ def _union_bbox(bboxes: List[List[float]]) -> Optional[List[float]]:
     return [float(x0), float(y0), float(x1), float(y1)]
 
 
+def _highlight_pad() -> float:
+    raw = os.getenv("HIGHLIGHT_PAD") or os.getenv("HIGHLIGHT_PAD_PX") or ""
+    try:
+        pad = float(raw)
+    except Exception:
+        pad = 1.5
+    return max(0.0, pad)
+
+
+def _pad_bbox(bbox: List[float], pad: float) -> List[float]:
+    if pad <= 0:
+        return [float(v) for v in bbox]
+    x0, y0, x1, y1 = [float(v) for v in bbox]
+    return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
+
+
 def _line_union_boxes(
     word_ids: List[str],
     words_by_id: Dict[str, Dict[str, Any]],
@@ -242,10 +258,11 @@ def _line_union_boxes(
         by_line.setdefault((page_no, line_id), []).append(bb)
 
     by_page: Dict[int, List[List[float]]] = {}
+    pad = _highlight_pad()
     for (page_no, _line_id), bbs in by_line.items():
         merged = _union_bbox(bbs)
         if merged:
-            by_page.setdefault(page_no, []).append(merged)
+            by_page.setdefault(page_no, []).append(_pad_bbox(merged, pad))
     return by_page
 
 
@@ -278,6 +295,8 @@ def _build_system_prompt(value_type: str) -> str:
             f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
             f'- If the requested value type is "{value_type}", follow it exactly.',
             '- If the requested value type is "Auto", infer the best match.',
+            "- For atomic data types (Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount), the cited span must be the minimal span that fully represents the value.",
+            "- For Free-text (or Auto->Free-text), the cited span should be the shortest complete span that answers the question; avoid partial fragments.",
             "- Provide exactly 1 citation span when possible.",
             "- start_text/end_text must match the first/last token text in the cited span.",
             "- source must be verbatim contiguous text from the cited span (may include line wraps).",

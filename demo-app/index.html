@@ -63,8 +63,19 @@
 
         <div class="card">
           <div class="tabs">
-            <button id="tabIndexed" class="tab active" data-mode="indexed">Indexed</button>
-            <button id="tabRaw" class="tab" data-mode="raw">Raw + Fuzzy</button>
+            <button id="tabRaw" class="tab active" data-mode="raw">Raw + Fuzzy</button>
+            <button id="tabIndexed" class="tab" data-mode="indexed">Indexed</button>
+          </div>
+          <div class="row">
+            <label for="promptPreset">Quick prompts</label>
+            <select id="promptPreset">
+              <option value="">Select a prompt...</option>
+              <option value="What is the second reported symptom?">What is the second reported symptom?</option>
+              <option value="What is the treatment plan?">What is the treatment plan?</option>
+              <option value="Who signed the document?">Who signed the document?</option>
+              <option value="What is the full text of the disclaimer?">What is the full text of the disclaimer?</option>
+              <option value="What happened on 9/13/2023?">What happened on 9/13/2023?</option>
+            </select>
           </div>
           <div class="row">
             <label for="question">Question</label>

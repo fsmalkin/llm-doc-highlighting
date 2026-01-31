@@ -8,7 +8,7 @@ Core ideas implemented here:
 - Span-based citations: the model cites using `start_token`/`end_token` over that reading view, and we deterministically map spans -> `word_ids` -> geometry.
 - Deterministic fallback: when LLM is unavailable or returns invalid spans, fall back to simple deterministic matching.
 
-> **Prominent next step:** the full-document, word-token-indexed reading view is intentionally unambiguous, but it inflates token count. The next experiment is a two-pass resolver (coarse localization -> fine span citation) to reduce expensive-model tokens while preserving grounding. See `docs/next-steps.md`.
+> **Prominent next step:** move into iterative evaluation. Start with small samples on each dataset to validate end-to-end data collection and reporting before scaling runs. See `docs/next-steps.md`.
 
 ## Quickstart (local)
 
@@ -36,6 +36,7 @@ Environment:
   - Set `GOOGLE_APPLICATION_CREDENTIALS` in `.env` to your service account JSON.
   - Vision rails are the primary method; set `VISION_RAILS_PRIMARY=0` to allow fallback.
   - If Vision is unavailable and fallback is allowed, enable OCR with `OCR_ENABLED=1` in `.env.local` (Tesseract).
+  - Future: consider merging adjacent line rail boxes for handwriting-heavy pages to reduce disjoint highlights (tradeoff: risk of over-highlighting across lines).
 
 Run Phase 1 preprocessing:
 ```bash

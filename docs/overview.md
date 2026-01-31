@@ -6,7 +6,7 @@ This repo captures a document highlighting pipeline that converts unstructured d
 
 The design is intentionally preprocessing-first: expensive or fragile steps (parsing, OCR, geometry extraction) happen once per document/config and are cached. Downstream logic operates on stable artifacts rather than re-parsing the source file.
 
-> **Prominent next step:** investigate a two-pass resolver to avoid sending a full-document, word-token-indexed reading view to the expensive model. See `docs/next-steps.md`.
+> **Prominent next step:** run iterative evaluations (small samples first) to validate end-to-end data collection and reporting before scaling. See `docs/next-steps.md`.
 
 ## Core outcomes
 

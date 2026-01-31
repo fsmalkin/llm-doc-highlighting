@@ -11,6 +11,7 @@ const llmResponseEl = document.getElementById("llmResponse");
 const valueTypeIndicatorEl = document.getElementById("valueTypeIndicator");
 const debugEl = document.getElementById("debug");
 const questionEl = document.getElementById("question");
+const promptPresetEl = document.getElementById("promptPreset");
 const valueTypeEl = document.getElementById("valueType");
 const keyStatusEl = document.getElementById("keyStatus");
 const railsStatusEl = document.getElementById("railsStatus");
@@ -361,6 +362,16 @@ async function initViewer() {
   documentViewer = Core.documentViewer;
   Annotations = Core.Annotations;
 
+  if (documentViewer?.addEventListener) {
+    documentViewer.addEventListener("documentLoaded", () => {
+      if (UI?.setZoomLevel) {
+        UI.setZoomLevel(1);
+      } else if (documentViewer?.setZoomLevel) {
+        documentViewer.setZoomLevel(1);
+      }
+    });
+  }
+
   if (annotationManager?.setReadOnly) {
     annotationManager.setReadOnly(true);
   }
@@ -582,6 +593,12 @@ function setMode(nextMode) {
 
 tabIndexedEl?.addEventListener("click", () => setMode("indexed"));
 tabRawEl?.addEventListener("click", () => setMode("raw"));
+promptPresetEl?.addEventListener("change", () => {
+  const nextValue = String(promptPresetEl.value || "").trim();
+  if (!nextValue) return;
+  questionEl.value = nextValue;
+  questionEl.focus();
+});
 
 questionEl.value = DEFAULT_QUESTION;
 setAnswer("-");

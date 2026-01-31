@@ -30,33 +30,22 @@ Notes
 - The UI can be basic. Focus on demo reliability over polish.
 - Rails are required in all cases: always build a Geometry Index and render highlights.
 - Vision rails are preferred when credentials are present; Tesseract/OCRmyPDF remain fallback options.
+- Potential enhancement: for handwriting or loose line spacing, consider merging adjacent line rail boxes with tight thresholds to reduce disjoint highlights (risk: over-highlighting across nearby lines).
 - Reference: the prior chat flow in factr-2 (extract-citations) is the closest precedent for the question -> answer -> cited span loop.
 
-## P1 - Benchmarks
+## P1 - Benchmarks (iterative)
 
-Goal: quantify baseline quality and failure modes.
+Goal: quantify baseline quality and failure modes without committing to costly full runs until the pipeline is stable.
 
 Benchmarks
 - FUNSD (form-like documents)
 - A long-form dataset (multi-page prose) to stress span accuracy at length
 
 Outputs
-- A repeatable evaluation script
+- An evaluation harness that runs end-to-end on small samples first
 - Metrics: span validity rate, mapping success rate, accuracy (exact/partial), latency, token cost
-- A short report comparing datasets and highlighting failure modes
-
-## P2 - Two-pass method exploration
-
-Goal: reduce expensive model token usage while preserving grounding accuracy.
-
-Approach
-- Pass 1: coarse localization over a lightweight reading view
-- Pass 2: fine span citation over a small window using a cheaper model
-
-Outputs
-- Prototype implementation behind a flag
-- Side-by-side evaluation vs baseline
-- Decision: keep, iterate, or drop
+- A short report per dataset with failure modes and data quality notes
+- A clear scale-up plan once small-sample runs succeed (larger samples, full dataset)
 
 ## Out of scope (for now)
 - Changing the LLM provider or core grounding format

@@ -30,7 +30,7 @@ Inputs:
 - `doc_hash` (to load Phase 1 artifacts)
 - a query (LLM-first) or a citation substring (fallback)
 
-> **Cost note:** the current approach can be token-heavy because it annotates every word token in the reading view. A proposed evolution is a two-pass resolver (coarse -> fine) to reduce expensive-model tokens. See `docs/next-steps.md`.
+> **Evaluation note:** the current approach can be token-heavy because it annotates every word token in the reading view. We will validate cost/accuracy on small samples before scaling full dataset runs. See `docs/next-steps.md`.
 
 Outputs:
 - a highlight object (or a canonical JSON file) with:
@@ -51,8 +51,6 @@ LLM-first (token-indexed reading view):
 Deterministic fallback:
 - When the LLM is unavailable (no key) or returns invalid spans, fall back to exact substring matching on line text and map to a contiguous token window when possible.
 
-## Next experiment: two-pass resolver
+## Next experiment: iterative evaluation
 
-See `docs/next-steps.md` for a proposal to reduce token cost by running:
-- Pass 1 (coarse): locate a relevant region without word-level token markup
-- Pass 2 (fine): produce strict `start_token`/`end_token` spans only inside that region
+See `docs/next-steps.md` for an evaluation plan that starts with small samples, verifies end-to-end reporting, then scales.

@@ -42,38 +42,24 @@ Risks and mitigations
 Rollback
 - Demo is isolated to new files or a new folder, so deletion is a clean rollback
 
-### M2 - Benchmarks (P1)
+### M2 - Benchmarks (P1, iterative)
 
 Scope
-- Baseline evaluation on FUNSD
-- Baseline evaluation on a long-form dataset
+- Baseline evaluation on FUNSD (small sample first, then scale)
+- Baseline evaluation on a long-form dataset (small sample first, then scale)
 
 Acceptance criteria
-- A script that runs end-to-end and produces metrics in a report file
-- A short summary of results and failure modes
+- A script that runs end-to-end on a small sample and produces metrics in a report file
+- A short summary of results, failure modes, and data quality notes
+- A defined scale-up plan once small-sample runs succeed
 
 Risks and mitigations
 - Dataset licensing: confirm usage and document the source
 - Annotation mismatch: define an evaluation rubric for span overlap
+- Cost blowup: gate large runs behind successful small-sample validations
 
 Rollback
 - Bench tooling is additive and can be removed without touching core pipeline
-
-### M3 - Two-pass exploration (P2)
-
-Scope
-- Implement optional two-pass resolver behind a flag
-- Compare cost and accuracy vs baseline
-
-Acceptance criteria
-- Two-pass is measurable on both datasets
-- Results are captured in the same report format
-
-Risks and mitigations
-- Coarse localization errors: add padding windows and retry logic
-
-Rollback
-- Feature flag allows safe disable; code can be removed if not adopted
 
 ## Open decisions
 - Choose the long-form dataset for P1

@@ -193,6 +193,22 @@ def _union_bbox(bboxes: List[List[float]]) -> Optional[List[float]]:
     return [float(x0), float(y0), float(x1), float(y1)]
 
 
+def _highlight_pad() -> float:
+    raw = os.getenv("HIGHLIGHT_PAD") or os.getenv("HIGHLIGHT_PAD_PX") or ""
+    try:
+        pad = float(raw)
+    except Exception:
+        pad = 1.5
+    return max(0.0, pad)
+
+
+def _pad_bbox(bbox: List[float], pad: float) -> List[float]:
+    if pad <= 0:
+        return [float(v) for v in bbox]
+    x0, y0, x1, y1 = [float(v) for v in bbox]
+    return [x0 - pad, y0 - pad, x1 + pad, y1 + pad]
+
+
 def _line_union_boxes(
     word_ids: List[str],
     words_by_id: Dict[str, Dict[str, Any]],
@@ -214,10 +230,11 @@ def _line_union_boxes(
         by_line.setdefault((page_no, line_id), []).append(bb)
 
     by_page: Dict[int, List[List[float]]] = {}
+    pad = _highlight_pad()
     for (page_no, _line_id), bbs in by_line.items():
         merged = _union_bbox(bbs)
         if merged:
-            by_page.setdefault(page_no, []).append(merged)
+            by_page.setdefault(page_no, []).append(_pad_bbox(merged, pad))
     return by_page
 
 
@@ -343,6 +360,8 @@ def _build_pass1_prompt(question: str, plain_text: str, value_type: str) -> List
             f'- If the requested value type is "{value_type}", follow it exactly.',
             '- If the requested value type is "Auto", infer the best match.',
             "- raw must be the value only (no labels) and must be a verbatim span from the document text.",
+            "- For atomic data types (Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount), raw must be the minimal span that fully represents the value.",
+            "- For Free-text (or Auto->Free-text), raw should be the shortest complete span that answers the question; avoid partial fragments.",
             "- raw_extra should be a larger verbatim snippet that contains raw (can be empty).",
             "- If you cannot answer, return {\"answer\":\"\",\"value_type\":\"Auto\",\"raw\":\"\",\"raw_extra\":\"\"}.",
             "- JSON only. No extra commentary.",
