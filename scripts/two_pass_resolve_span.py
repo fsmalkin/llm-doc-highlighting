@@ -348,7 +348,10 @@ def _build_window_reading_view(ctx: Dict[str, Any], start_token: int, end_token:
     return "\n".join(out_lines)
 
 
-def _build_pass1_prompt(question: str, plain_text: str, value_type: str) -> List[Dict[str, str]]:
+def _build_pass1_prompt(prompt_mode: str, query: str, plain_text: str, value_type: str) -> List[Dict[str, str]]:
+    extra_rule = ""
+    if prompt_mode == "field_label":
+        extra_rule = "- The provided label is a field key; return the corresponding field value text, not the label."
     system = "\n".join(
         [
             "You are given document text without word indexes.",
@@ -359,6 +362,7 @@ def _build_pass1_prompt(question: str, plain_text: str, value_type: str) -> List
             f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
             f'- If the requested value type is "{value_type}", follow it exactly.',
             '- If the requested value type is "Auto", infer the best match.',
+            extra_rule if extra_rule else "- Use the question to find the best answer span in the document.",
             "- raw must be the value only (no labels) and must be a verbatim span from the document text.",
             "- For atomic data types (Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount), raw must be the minimal span that fully represents the value.",
             "- For Free-text (or Auto->Free-text), raw should be the shortest complete span that answers the question; avoid partial fragments.",
@@ -367,19 +371,36 @@ def _build_pass1_prompt(question: str, plain_text: str, value_type: str) -> List
             "- JSON only. No extra commentary.",
         ]
     )
-    user = "\n".join(
-        [
-            "Question:",
-            question,
-            "",
-            "Document text:",
-            plain_text,
-        ]
-    )
+    if prompt_mode == "field_label":
+        user = "\n".join(
+            [
+                "Field label (key):",
+                query,
+                "",
+                "Task:",
+                "Find the corresponding field value in the document and return the minimal value span.",
+                "",
+                "Document text:",
+                plain_text,
+            ]
+        )
+    else:
+        user = "\n".join(
+            [
+                "Question:",
+                query,
+                "",
+                "Document text:",
+                plain_text,
+            ]
+        )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
-def _build_pass2_prompt(question: str, indexed_window: str, value_type: str) -> List[Dict[str, str]]:
+def _build_pass2_prompt(prompt_mode: str, query: str, indexed_window: str, value_type: str) -> List[Dict[str, str]]:
+    extra_rule = ""
+    if prompt_mode == "field_label":
+        extra_rule = "- The provided label is a field key; return the corresponding field value text, not the label."
     system = "\n".join(
         [
             'You are given a "reading view" where each line starts with its global_line_no (0-based) followed by a tab and the text.',
@@ -393,6 +414,7 @@ def _build_pass2_prompt(question: str, indexed_window: str, value_type: str) -> 
             f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
             f'- If the requested value type is "{value_type}", follow it exactly.',
             '- If the requested value type is "Auto", infer the best match.',
+            extra_rule if extra_rule else "- Use the question to find the best answer span in the document.",
             "- Provide exactly 1 citation span when possible.",
             "- start_text/end_text must match the first/last token text in the cited span.",
             "- source must be verbatim contiguous text from the cited span (may include line wraps).",
@@ -401,15 +423,29 @@ def _build_pass2_prompt(question: str, indexed_window: str, value_type: str) -> 
             "- JSON only. No extra commentary.",
         ]
     )
-    user = "\n".join(
-        [
-            "Question:",
-            question,
-            "",
-            "Reading view:",
-            indexed_window,
-        ]
-    )
+    if prompt_mode == "field_label":
+        user = "\n".join(
+            [
+                "Field label (key):",
+                query,
+                "",
+                "Task:",
+                "Find the corresponding field value in the document and return the minimal value span.",
+                "",
+                "Reading view:",
+                indexed_window,
+            ]
+        )
+    else:
+        user = "\n".join(
+            [
+                "Question:",
+                query,
+                "",
+                "Reading view:",
+                indexed_window,
+            ]
+        )
     return [{"role": "system", "content": system}, {"role": "user", "content": user}]
 
 
@@ -609,6 +645,12 @@ def main() -> None:
     )
     ap.add_argument("--out", default=None, help="Optional output path")
     ap.add_argument("--trace", action="store_true", help="Include LLM request/response in output JSON")
+    ap.add_argument(
+        "--prompt_mode",
+        choices=["question", "field_label"],
+        default=os.getenv("PROMPT_MODE", "question"),
+        help="Prompt framing: question (default) or field_label (key -> value).",
+    )
     args = ap.parse_args()
 
     pdf_path = pathlib.Path(args.doc)
@@ -635,7 +677,8 @@ def main() -> None:
 
     value_type_req = _normalize_value_type(args.value_type)
     model_pass1 = _openai_model_pass1()
-    pass1_msgs = _build_pass1_prompt(str(args.query).strip(), flat_text, value_type_req)
+    prompt_mode = str(args.prompt_mode or "question")
+    pass1_msgs = _build_pass1_prompt(prompt_mode, str(args.query).strip(), flat_text, value_type_req)
     temp1 = None if _is_gpt5_model(model_pass1) else 0
     tool_name_pass1 = "return_raw_span"
     tool_schema_pass1 = _tool_schema_pass1(value_type_req)
@@ -698,7 +741,7 @@ def main() -> None:
             raise RuntimeError("Indexed window is empty for pass2.")
 
         model_pass2 = _openai_model_pass2()
-        pass2_msgs = _build_pass2_prompt(str(args.query).strip(), indexed_window, value_type_req)
+        pass2_msgs = _build_pass2_prompt(prompt_mode, str(args.query).strip(), indexed_window, value_type_req)
         temp2 = None if _is_gpt5_model(model_pass2) else 0
         tool_name_pass2 = "return_indexed_span"
         tool_schema_pass2 = _tool_schema_pass2(value_type_req)

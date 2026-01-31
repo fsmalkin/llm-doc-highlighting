@@ -48,9 +48,14 @@ LLM-first (token-indexed reading view):
 - Tool-calling JSON is enforced for structured outputs.
 - We validate and (optionally) snap spans using guard tokens, then map spans -> `word_ids` -> geometry.
 
+Raw + fuzzy (two-pass):
+- Pass 1 asks for `raw` and `raw_extra` (verbatim span + context).
+- We fuzzy-match `raw` into the reading view.
+- If there is no exact unique match, pass 2 sends the best match window with word indices to a cheaper model to return token indices.
+
 Deterministic fallback:
 - When the LLM is unavailable (no key) or returns invalid spans, fall back to exact substring matching on line text and map to a contiguous token window when possible.
 
 ## Next experiment: iterative evaluation
 
-See `docs/next-steps.md` for an evaluation plan that starts with small samples, verifies end-to-end reporting, then scales.
+See `docs/next-steps.md` for an evaluation plan that starts with small samples, verifies end-to-end reporting, then scales. The plan includes A/B comparison between indexed and raw+fuzzy methods.

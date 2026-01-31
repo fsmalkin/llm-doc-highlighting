@@ -281,7 +281,10 @@ def _normalize_poly(poly_abs: List[List[float]], pw: float, ph: float) -> List[L
     return [[float(x) / pw, float(y) / ph] for x, y in poly_abs]
 
 
-def _build_system_prompt(value_type: str) -> str:
+def _build_system_prompt(value_type: str, prompt_mode: str) -> str:
+    extra_rule = ""
+    if prompt_mode == "field_label":
+        extra_rule = "- The provided label is a field key; return the corresponding field value text, not the label."
     return "\n".join(
         [
             'You are given a "reading view" where each line starts with its global_line_no (0-based) followed by a tab and the text.',
@@ -295,6 +298,7 @@ def _build_system_prompt(value_type: str) -> str:
             f"- value_type must be one of: {', '.join(VALUE_TYPES)}.",
             f'- If the requested value type is "{value_type}", follow it exactly.',
             '- If the requested value type is "Auto", infer the best match.',
+            extra_rule if extra_rule else "- Use the question to find the best answer span in the document.",
             "- For atomic data types (Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount), the cited span must be the minimal span that fully represents the value.",
             "- For Free-text (or Auto->Free-text), the cited span should be the shortest complete span that answers the question; avoid partial fragments.",
             "- Provide exactly 1 citation span when possible.",
@@ -303,6 +307,31 @@ def _build_system_prompt(value_type: str) -> str:
             "- substr must be the same verbatim contiguous text from the cited span.",
             '- If you cannot answer, return {"answer":"","source":"","citations":[]}.',
             "- JSON only. No extra commentary.",
+        ]
+    )
+
+
+def _build_user_prompt(prompt_mode: str, query: str, reading_view_text: str) -> str:
+    if prompt_mode == "field_label":
+        return "\n".join(
+            [
+                "Field label (key):",
+                query,
+                "",
+                "Task:",
+                "Find the corresponding field value in the document and return the minimal value span.",
+                "",
+                "Reading view:",
+                reading_view_text,
+            ]
+        )
+    return "\n".join(
+        [
+            "Question:",
+            query,
+            "",
+            "Reading view:",
+            reading_view_text,
         ]
     )
 
@@ -353,6 +382,12 @@ def main() -> None:
         help="Value type (Auto, Date, Duration, Name, Phone, Email, Address, Number, Currency / Amount, Free-text)",
     )
     ap.add_argument("--out", default=None, help="Optional output path (default: artifacts/llm_resolve/<doc_hash>/<slug>.json)")
+    ap.add_argument(
+        "--prompt_mode",
+        choices=["question", "field_label"],
+        default=os.getenv("PROMPT_MODE", "question"),
+        help="Prompt framing: question (default) or field_label (key -> value).",
+    )
     ap.add_argument("--trace", action="store_true", help="Include LLM request/response in output JSON")
     args = ap.parse_args()
 
@@ -372,16 +407,9 @@ def main() -> None:
         raise RuntimeError("Reading view is empty; check Phase 1 artifacts.")
 
     value_type_req = _normalize_value_type(args.value_type)
-    system_prompt = _build_system_prompt(value_type_req)
-    user_prompt = "\n".join(
-        [
-            "Question:",
-            str(args.query).strip(),
-            "",
-            "Reading view:",
-            reading_view_text,
-        ]
-    )
+    prompt_mode = str(args.prompt_mode or "question")
+    system_prompt = _build_system_prompt(value_type_req, prompt_mode)
+    user_prompt = _build_user_prompt(prompt_mode, str(args.query).strip(), reading_view_text)
 
     model = str(args.model or _openai_model())
     messages = [

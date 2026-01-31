@@ -7,8 +7,8 @@ The next step is evaluation, not new methods. We will run small samples first to
 Goal: build confidence in data collection, metrics, and reporting without expensive full runs.
 
 Phases:
-- **Phase A (smoke sample):** tiny sample per dataset to validate parsing, caching, and report generation.
-- **Phase B (pilot):** larger sample to confirm stability, cost, and failure modes.
+- **Phase A (smoke sample):** tiny sample per dataset to validate parsing, caching, and report generation. Run both methods (indexed vs raw+fuzzy) on the same examples.
+- **Phase B (pilot):** larger sample to confirm stability, cost, and failure modes; continue A/B comparison.
 - **Phase C (scale):** full dataset once Phase A/B are stable and acceptable.
 
 Metrics to capture:
@@ -17,6 +17,7 @@ Metrics to capture:
 - accuracy (exact/partial overlap)
 - latency (end-to-end + per pass)
 - token cost (prompt + completion)
+- A/B deltas (indexed vs raw+fuzzy, pass2 fallback rate)
 
 ## 2) Evaluation hygiene
 
@@ -24,7 +25,17 @@ To avoid wasted spend or noisy results:
 - lock config and model versions per run
 - store run metadata (dataset name, sample size, model, OCR/rails settings)
 - keep a clear, reproducible report format
+ - use explicit prompt framing (field label -> value) for FUNSD to avoid ambiguity
 
 ## 3) Optional experiments (after baseline is stable)
 
 - LLM OCR: evaluate text recall, bbox stability, and cost before replacing current rails.
+
+## 4) Eval Review UX (demo viewer)
+
+Goal: make it easy to visually inspect GT vs predicted boxes and overlap per example.
+
+Minimum features:
+- List of examples with pass/fail and IoU threshold filter
+- Viewer overlay: GT boxes (green), predicted boxes (blue), overlap (teal hatch)
+- Side panel: field label, expected value, model answer, error reason

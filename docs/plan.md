@@ -12,6 +12,7 @@ This plan tracks the work needed to execute the roadmap. It is written for non-t
 - We can run a local web server for the demo
 - The demo uses a fixed PDF committed under demo-app/assets
 - Rails (Geometry Index) are required for all demos; Vision rails are preferred when available
+- GPT-5-mini is the default evaluation model for baseline runs
 
 ## Milestones
 
@@ -47,24 +48,28 @@ Rollback
 Scope
 - Baseline evaluation on FUNSD (small sample first, then scale)
 - Baseline evaluation on a long-form dataset (small sample first, then scale)
+- A/B comparison: indexed (token-based) vs raw+fuzzy (raw + raw_extra, with pass2 fallback)
+- Eval Review UX in the demo viewer (GT vs predicted overlays)
 
 Acceptance criteria
 - A script that runs end-to-end on a small sample and produces metrics in a report file
+- A/B report comparing indexed vs raw+fuzzy on the same examples
 - A short summary of results, failure modes, and data quality notes
 - A defined scale-up plan once small-sample runs succeed
+- Eval Review UI can load a run artifact and visualize overlaps
 
 Risks and mitigations
 - Dataset licensing: confirm usage and document the source
 - Annotation mismatch: define an evaluation rubric for span overlap
 - Cost blowup: gate large runs behind successful small-sample validations
+ - Prompt ambiguity: use explicit field-label -> value framing for FUNSD
 
 Rollback
 - Bench tooling is additive and can be removed without touching core pipeline
 
 ## Open decisions
 - Choose the long-form dataset for P1
-- Decide how much UI polish is needed for the demo
-- Decide how to store demo artifacts (cache vs temp)
+- Decide IoU threshold(s) for pass/fail in Eval Review
 
 ## Tracking
 - Use a simple checklist in docs/plan.md for status updates

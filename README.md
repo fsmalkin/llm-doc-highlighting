@@ -88,6 +88,26 @@ Walkthrough:
 Example question:
 - What is the date of visit?
 
+## Evaluation (FUNSD)
+
+The FUNSD dataset is not included in git. Use the helper to download and extract it:
+```bash
+python scripts\funsd_download.py --dest data\funsd
+```
+
+Run a small A/B sample (indexed vs raw+fuzzy):
+```bash
+python scripts\funsd_eval.py --split test --limit 10 --compare --prompt-mode field_label
+```
+
+Outputs:
+- `reports/funsd/run_<timestamp>.json` (summary + per-example data)
+- Per-example raw resolver outputs under `reports/funsd/runs/`
+
+Notes:
+- The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
+- FUNSD prompts treat the field label as the key and ask for the corresponding value span.
+
 ## Docs
 
 - `docs/overview.md` - what exists and how it fits together

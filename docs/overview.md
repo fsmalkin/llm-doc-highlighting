@@ -24,6 +24,9 @@ The design is intentionally preprocessing-first: expensive or fragile steps (par
    - The LLM returns a short answer plus a cited source span.
    - Citations are `{ start_token, end_token, start_text, end_text, substr }`.
    - We validate and (optionally) snap spans using the guard tokens, then map spans -> `word_ids` -> geometry.
+6. Raw + fuzzy resolver (two-pass)
+   - First pass asks for raw span + raw extra context.
+   - If mapping is ambiguous, a second pass uses a cheaper indexed resolver to return token indices.
 6. Deterministic fallback
    - When the LLM is unavailable or span validation fails, a simple deterministic matcher can still resolve some citations.
 

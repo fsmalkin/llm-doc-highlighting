@@ -75,3 +75,19 @@ Fixed document:
 ```
 demo-app\assets\Physician_Report_Scanned.pdf
 ```
+
+## 7) FUNSD evaluation (iterative)
+
+Download and extract FUNSD (dataset is git-ignored):
+```bash
+python scripts\funsd_download.py --dest data\funsd
+```
+
+Run a small A/B sample:
+```bash
+python scripts\funsd_eval.py --split test --limit 10 --compare --prompt-mode field_label
+```
+
+Outputs:
+- `reports/funsd/run_<timestamp>.json` (summary + per-example data)
+- `reports/funsd/runs/` (per-example resolver outputs)
