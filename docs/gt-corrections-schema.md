@@ -32,6 +32,12 @@ Item fields:
   - `eval_example_id` (string)
   - `eval_url_params` (string)
 
+CVAT mapping (recommended):
+- Label: `gt_fix`
+- Attributes:
+  - `field_label`, `value` (required)
+  - `value_type`, `notes`, `eval_example_id`, `eval_run`, `eval_url_params` (optional)
+
 Conventions:
 - Use pixel coordinates with origin top-left (y increases downward).
 - Keep values minimal and exact to the corrected span.

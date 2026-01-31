@@ -97,3 +97,10 @@ Review in the demo UI:
 Notes on GT quality:
 - FUNSD has known GT issues. Track corrections under `data/gt_corrections/funsd/`.
 - See `docs/gt-corrections.md` for the CVAT-based workflow.
+
+## 8) Import CVAT corrections
+
+After exporting CVAT annotations.xml (CVAT for images 1.1), import to repo JSON:
+```bash
+python scripts\cvat_import.py --dataset funsd --xml path\to\annotations.xml --out-dir data\gt_corrections
+```

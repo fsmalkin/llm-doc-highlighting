@@ -36,12 +36,27 @@ High-level steps:
 - Start CVAT with Docker Compose
 - Create a project for the dataset (e.g., FUNSD)
 - Upload the images (or the PDFs for single-page docs)
-- Add a single label (e.g., `gt_fix`) with attributes for `field_label`, `value`, and `notes`
+- Add a single label: `gt_fix`
+  - Attributes (all strings):
+    - `field_label` (required)
+    - `value` (required)
+    - `value_type` (optional)
+    - `notes` (optional)
+    - `eval_example_id` (optional)
+    - `eval_run` (optional)
+    - `eval_url_params` (optional)
 - Draw rectangles for corrected values
-- Export as "CVAT for images 1.1" (annotations.xml)
+- Export as \"CVAT for images 1.1\" (annotations.xml)
 
-We will add a small importer script next so the CVAT export can be converted directly into
-`data/gt_corrections/<dataset>/<doc_id>.json` records.
+Import the export into repo JSON:
+```bash
+python scripts\\cvat_import.py --dataset funsd --xml path\\to\\annotations.xml --out-dir data\\gt_corrections
+```
+
+Use `--overwrite` to replace existing corrections for a doc.
+
+The importer writes:
+- `data/gt_corrections/<dataset>/<doc_id>.json`
 
 ## FUNSD note
 
