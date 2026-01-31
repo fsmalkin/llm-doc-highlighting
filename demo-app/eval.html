@@ -21,39 +21,54 @@
         </div>
 
         <div class="card">
-          <div class="label">Run</div>
-          <div class="row">
-            <label>Selected run</label>
-            <div id="evalRunName" class="answer">-</div>
+          <div class="label">Selected data point</div>
+          <div class="eval-block">
+            <div class="label">Field label</div>
+            <div id="evalFieldLabel" class="answer">-</div>
           </div>
-          <div class="muted" id="evalRunMeta">-</div>
-          <div class="row">
-            <a class="link" href="/stats.html">Change run</a>
+          <div class="eval-block">
+            <div class="label">Expected value (ground truth)</div>
+            <div id="evalExpectedValue" class="answer">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Raw + Fuzzy answer</div>
+            <div id="evalAnswerRaw" class="answer">-</div>
+          </div>
+          <div class="eval-block">
+            <div class="label">Indexed answer</div>
+            <div id="evalAnswerIndexed" class="answer">-</div>
           </div>
         </div>
 
         <div class="card">
-          <div class="label">Browse</div>
-          <div class="row">
-            <label for="docSearch">Search documents</label>
-            <input id="docSearch" type="text" placeholder="Search by doc id..." />
+          <div class="label">A/B summary</div>
+          <div class="ab-grid">
+            <div class="ab-head">Method</div>
+            <div class="ab-head">IoU</div>
+            <div class="ab-head">Precision</div>
+            <div class="ab-head">Recall</div>
+            <div class="ab-head">Pass2</div>
+
+            <div class="ab-label">Raw + Fuzzy</div>
+            <div id="metricRawIou" class="badge">-</div>
+            <div id="metricRawPrecision" class="badge">-</div>
+            <div id="metricRawRecall" class="badge">-</div>
+            <div id="metricRawPass2" class="badge">-</div>
+
+            <div class="ab-label">Indexed</div>
+            <div id="metricIndexedIou" class="badge">-</div>
+            <div id="metricIndexedPrecision" class="badge">-</div>
+            <div id="metricIndexedRecall" class="badge">-</div>
+            <div id="metricIndexedPass2" class="badge">-</div>
           </div>
-          <div class="row">
-            <label for="docSelect">Document</label>
-            <select id="docSelect">
-              <option value="">Select a run first</option>
-            </select>
-          </div>
-          <div class="row">
-            <label for="exampleSelect">Data point</label>
-            <select id="exampleSelect">
-              <option value="">Select a document first</option>
-            </select>
-          </div>
-          <div class="row">
-            <label>Docs (filtered)</label>
-            <div id="docList" class="doc-list"></div>
-          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Scoring definition</div>
+          <p class="muted">
+            Scores use strict word-box overlap (IoU threshold 0.5) on deduped boxes. Overlays are visual and
+            can look identical even when strict scores differ.
+          </p>
         </div>
 
         <div class="card">
@@ -108,45 +123,50 @@
         </div>
 
         <div class="card">
-          <div class="label">Selected data point</div>
-          <div class="eval-block">
-            <div class="label">Field label</div>
-            <div id="evalFieldLabel" class="answer">-</div>
+          <div class="label">Browse</div>
+          <div class="row">
+            <label for="docSearch">Search documents</label>
+            <input id="docSearch" type="text" placeholder="Search by doc id..." />
           </div>
-          <div class="eval-block">
-            <div class="label">Expected value</div>
-            <div id="evalExpectedValue" class="answer">-</div>
+          <div class="row">
+            <label for="docSelect">Document</label>
+            <select id="docSelect">
+              <option value="">Select a run first</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="exampleSelect">Data point</label>
+            <select id="exampleSelect">
+              <option value="">Select a document first</option>
+            </select>
+          </div>
+          <div class="row">
+            <div class="btns">
+              <button id="prevSample">Previous</button>
+              <button id="nextSample">Next</button>
+            </div>
+          </div>
+          <div class="row">
+            <label>Docs (filtered)</label>
+            <div id="docList" class="doc-list"></div>
           </div>
         </div>
 
         <div class="card">
-          <div class="label">A/B summary</div>
-          <div class="ab-grid">
-            <div class="ab-head">Method</div>
-            <div class="ab-head">IoU</div>
-            <div class="ab-head">Precision</div>
-            <div class="ab-head">Recall</div>
-            <div class="ab-head">Pass2</div>
-
-            <div class="ab-label">Raw + Fuzzy</div>
-            <div id="metricRawIou" class="badge">-</div>
-            <div id="metricRawPrecision" class="badge">-</div>
-            <div id="metricRawRecall" class="badge">-</div>
-            <div id="metricRawPass2" class="badge">-</div>
-
-            <div class="ab-label">Indexed</div>
-            <div id="metricIndexedIou" class="badge">-</div>
-            <div id="metricIndexedPrecision" class="badge">-</div>
-            <div id="metricIndexedRecall" class="badge">-</div>
-            <div id="metricIndexedPass2" class="badge">-</div>
+          <div class="label">Run</div>
+          <div class="row">
+            <label for="evalRunSelect">Eval run</label>
+            <select id="evalRunSelect">
+              <option value="">Loading runs...</option>
+            </select>
           </div>
-          <div class="eval-block">
-            <div class="label">Raw + Fuzzy answer</div>
-            <div id="evalAnswerRaw" class="answer">-</div>
+          <div class="row">
+            <label>Selected run</label>
+            <div id="evalRunName" class="answer">-</div>
           </div>
-          <div class="eval-block">
-            <div class="label">Indexed answer</div>
-            <div id="evalAnswerIndexed" class="answer">-</div>
+          <div class="muted" id="evalRunMeta">-</div>
+          <div class="row">
+            <a class="link" href="/stats.html">Open stats</a>
           </div>
         </div>
       </aside>

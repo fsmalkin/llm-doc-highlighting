@@ -580,6 +580,7 @@ def main() -> None:
 
     out = {
         "meta": {
+            "eval_schema_version": 2,
             "dataset": "FUNSD",
             "split": args.split,
             "sample_size": len(run_examples),
@@ -592,6 +593,12 @@ def main() -> None:
             "iou_threshold": args.iou_thresh,
             "rails_required": _bool_env("RAILS_REQUIRED", "1"),
             "vision_primary": os.getenv("VISION_RAILS_PRIMARY", "1") != "0",
+            "canonicalization": {
+                "dedupe_expected_words": True,
+                "dedupe_expected_boxes": True,
+                "dedupe_pred_boxes": True,
+                "box_rounding_decimals": 2,
+            },
         },
         "summary": summary,
         "examples": run_examples,

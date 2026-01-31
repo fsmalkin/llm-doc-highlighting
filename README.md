@@ -107,7 +107,7 @@ Outputs:
 Notes:
 - The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
 - FUNSD prompts treat the field label as the key and ask for the corresponding value span.
-- The demo app includes a Stats page at `/stats.html` for aggregate run metrics; pick a run there to open the Eval Review viewer.
+- The demo app includes a Stats page at `/stats.html` for aggregate run metrics and an Eval Review page at `/eval.html` with a run selector (or deep link via `?run=`).
 
 ## Docs
 

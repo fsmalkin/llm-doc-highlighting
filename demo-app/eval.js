@@ -2,10 +2,13 @@ const DEFAULT_DOC = "./assets/Physician_Report_Scanned-ocr.pdf";
 
 const evalRunMetaEl = document.getElementById("evalRunMeta");
 const evalRunNameEl = document.getElementById("evalRunName");
+const evalRunSelectEl = document.getElementById("evalRunSelect");
 const docSearchEl = document.getElementById("docSearch");
 const docSelectEl = document.getElementById("docSelect");
 const exampleSelectEl = document.getElementById("exampleSelect");
 const docListEl = document.getElementById("docList");
+const prevSampleEl = document.getElementById("prevSample");
+const nextSampleEl = document.getElementById("nextSample");
 
 const evalFieldLabelEl = document.getElementById("evalFieldLabel");
 const evalExpectedValueEl = document.getElementById("evalExpectedValue");
@@ -35,6 +38,7 @@ let Core = null;
 
 let runData = null;
 let docIndex = [];
+let filteredDocIds = [];
 let currentDocId = null;
 let pendingOverlay = null;
 
@@ -194,6 +198,35 @@ function dedupeBoxes(boxes) {
   return out;
 }
 
+function dedupeWords(words) {
+  const seen = new Set();
+  const out = [];
+  for (const w of words || []) {
+    const text = String(w?.text || "").trim();
+    const box = Array.isArray(w?.box) ? w.box.map((v) => Number(v)) : null;
+    if (!text || !box || box.length !== 4 || box.some((v) => Number.isNaN(v))) continue;
+    const key = `${text}|${box.map((v) => Math.round(v * 100) / 100).join(",")}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ text, box });
+  }
+  return out;
+}
+
+function sanitizeExample(ex) {
+  if (!ex) return ex;
+  const expectedWords = dedupeWords(ex.expected_words || []);
+  const expectedAnswer =
+    expectedWords.length > 0 ? expectedWords.map((w) => w.text).join(" ").trim() : ex.expected_answer;
+  const methods = ex.methods || {};
+  return {
+    ...ex,
+    expected_words: expectedWords,
+    expected_answer: expectedAnswer || ex.expected_answer,
+    methods,
+  };
+}
+
 function syncABMaster() {
   if (!toggleABEl) return;
   const a = showRawEl ? showRawEl.checked : false;
@@ -252,9 +285,11 @@ function applyDocFilter() {
   const items = term
     ? docIndex.filter((d) => d.docId.toLowerCase().includes(term))
     : docIndex.slice();
+  filteredDocIds = items.map((d) => d.docId);
   docSelectEl.innerHTML = "";
   if (docListEl) docListEl.innerHTML = "";
   if (!items.length) {
+    filteredDocIds = [];
     const opt = document.createElement("option");
     opt.value = "";
     opt.textContent = "No matches";
@@ -296,7 +331,7 @@ function applyDocFilter() {
   loadExamplesForDoc(items[0].docId);
 }
 
-function loadExamplesForDoc(docId) {
+function loadExamplesForDoc(docId, selectedExampleId = null) {
   const entry = docIndex.find((d) => d.docId === docId);
   exampleSelectEl.innerHTML = "";
   if (docListEl) {
@@ -318,8 +353,54 @@ function loadExamplesForDoc(docId) {
     opt.textContent = ex.question;
     exampleSelectEl.appendChild(opt);
   }
-  exampleSelectEl.value = entry.examples[0]?.id || "";
-  renderExample(entry.examples[0], { focus: true });
+  const target =
+    selectedExampleId && entry.examples.find((ex) => ex.id === selectedExampleId)
+      ? entry.examples.find((ex) => ex.id === selectedExampleId)
+      : entry.examples[0];
+  exampleSelectEl.value = target?.id || "";
+  renderExample(target, { focus: true });
+}
+
+function stepSample(direction) {
+  if (!filteredDocIds.length) return;
+  const currentDoc = String(docSelectEl?.value || currentDocId || "");
+  let docPos = filteredDocIds.indexOf(currentDoc);
+  if (docPos < 0) docPos = 0;
+  const entry = docIndex.find((d) => d.docId === filteredDocIds[docPos]);
+  const examples = entry?.examples || [];
+  if (!examples.length) return;
+  const currentId = String(exampleSelectEl?.value || "");
+  let exPos = examples.findIndex((ex) => ex.id === currentId);
+  if (exPos < 0) exPos = 0;
+
+  let nextDocPos = docPos;
+  let nextExPos = exPos + direction;
+
+  if (nextExPos < 0) {
+    nextDocPos = docPos - 1;
+    if (nextDocPos < 0) {
+      nextDocPos = 0;
+      nextExPos = 0;
+    } else {
+      const prevEntry = docIndex.find((d) => d.docId === filteredDocIds[nextDocPos]);
+      nextExPos = Math.max(0, (prevEntry?.examples?.length || 1) - 1);
+    }
+  } else if (nextExPos >= examples.length) {
+    nextDocPos = docPos + 1;
+    if (nextDocPos >= filteredDocIds.length) {
+      nextDocPos = filteredDocIds.length - 1;
+      nextExPos = examples.length - 1;
+    } else {
+      nextExPos = 0;
+    }
+  }
+
+  const targetDocId = filteredDocIds[nextDocPos];
+  const targetEntry = docIndex.find((d) => d.docId === targetDocId);
+  const targetExample = targetEntry?.examples?.[nextExPos];
+  if (!targetExample) return;
+  docSelectEl.value = targetDocId;
+  loadExamplesForDoc(targetDocId, targetExample.id);
 }
 
 function findExampleById(id) {
@@ -343,9 +424,9 @@ function renderExample(ex, opts = { focus: true }) {
   setText(evalAnswerIndexedEl, indexedData?.answer || indexedData?.error || "-");
   updateMetrics(rawData?.metrics || {}, indexedData?.metrics || {});
 
-  const gtBoxes = (ex.expected_words || []).map((w) => w.box).filter(Boolean);
-  const rawBoxes = collectBoxes(rawData);
-  const indexedBoxes = collectBoxes(indexedData);
+  const gtBoxes = dedupeBoxes((ex.expected_words || []).map((w) => w.box).filter(Boolean));
+  const rawBoxes = dedupeBoxes(collectBoxes(rawData));
+  const indexedBoxes = dedupeBoxes(collectBoxes(indexedData));
   const pageNo = rawData?.mapped?.pages?.[0]?.page || indexedData?.mapped?.pages?.[0]?.page || 1;
 
   const docId = ex.doc_id;
@@ -374,9 +455,23 @@ function getRunFromUrl() {
   return params.get("run") || "";
 }
 
+function updateRunInUrl(name) {
+  const params = new URLSearchParams(window.location.search || "");
+  if (name) {
+    params.set("run", name);
+  } else {
+    params.delete("run");
+  }
+  const qs = params.toString();
+  const nextUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+  if (window.history?.replaceState) {
+    window.history.replaceState(null, "", nextUrl);
+  }
+}
+
 function setRunEmptyState() {
   setText(evalRunNameEl, "No run selected");
-  setText(evalRunMetaEl, "Choose a run on the Stats page to begin.");
+  setText(evalRunMetaEl, "Choose a run to begin.");
   docSelectEl.innerHTML = "";
   exampleSelectEl.innerHTML = "";
   if (docListEl) {
@@ -388,10 +483,37 @@ function setRunEmptyState() {
   }
 }
 
+async function loadRuns() {
+  const data = await getJson("/api/eval_runs");
+  const runs = data?.runs || [];
+  if (!evalRunSelectEl) return;
+  evalRunSelectEl.innerHTML = "";
+  if (!runs.length) {
+    const opt = document.createElement("option");
+    opt.value = "";
+    opt.textContent = "No runs found";
+    evalRunSelectEl.appendChild(opt);
+    setRunEmptyState();
+    return;
+  }
+  for (const name of runs) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = name;
+    evalRunSelectEl.appendChild(opt);
+  }
+  const preferred = getRunFromUrl();
+  const initial = preferred && runs.includes(preferred) ? preferred : runs[0];
+  evalRunSelectEl.value = initial;
+  updateRunInUrl(initial);
+  await loadRun(initial);
+}
+
 async function loadRun(name) {
   if (!name) return;
   const data = await getJson(`/api/eval_run?name=${encodeURIComponent(name)}`);
-  runData = data;
+  const sanitizedExamples = (data?.examples || []).map((ex) => sanitizeExample(ex));
+  runData = { ...data, examples: sanitizedExamples };
   const meta = data?.meta || {};
   const metaText = [`dataset ${meta.dataset}`, `split ${meta.split}`, `samples ${meta.sample_size}`]
     .filter(Boolean)
@@ -399,7 +521,7 @@ async function loadRun(name) {
   setText(evalRunNameEl, name);
   setText(evalRunMetaEl, metaText || "-");
 
-  buildDocIndex(data?.examples || []);
+  buildDocIndex(sanitizedExamples);
   applyDocFilter();
 }
 
@@ -541,14 +663,20 @@ toggleABEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: false });
 });
+evalRunSelectEl?.addEventListener("change", () => {
+  const name = String(evalRunSelectEl.value || "");
+  updateRunInUrl(name);
+  if (name) {
+    loadRun(name).catch(() => setRunEmptyState());
+  } else {
+    setRunEmptyState();
+  }
+});
+prevSampleEl?.addEventListener("click", () => stepSample(-1));
+nextSampleEl?.addEventListener("click", () => stepSample(1));
 
 initViewer()
   .then(() => {
-    const run = getRunFromUrl();
-    if (!run) {
-      setRunEmptyState();
-      return null;
-    }
-    return loadRun(run).catch(() => setRunEmptyState());
+    return loadRuns().catch(() => setRunEmptyState());
   })
   .catch(() => {});
