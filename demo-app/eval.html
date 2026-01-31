@@ -56,51 +56,50 @@
           <div class="legend">
             <div class="legend-row">
               <span class="swatch gt"></span>
-              <span>Ground truth (gold/green outline)</span>
+              <span class="legend-label">Ground truth (gold/green outline)</span>
+              <div class="legend-controls">
+                <label class="switch">
+                  <input id="showGt" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
             <div class="legend-row">
               <span class="swatch method-a"></span>
-              <span>Method A: Raw + Fuzzy (red outline)</span>
+              <span class="legend-label">Method A: Raw + Fuzzy (red outline)</span>
+              <div class="legend-controls">
+                <label class="switch">
+                  <input id="showRaw" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
             <div class="legend-row">
               <span class="swatch method-b"></span>
-              <span>Method B: Indexed (blue outline)</span>
+              <span class="legend-label">Method B: Indexed (blue outline)</span>
+              <div class="legend-controls">
+                <label class="switch">
+                  <input id="showIndexed" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
             <div class="legend-row">
               <span class="swatch method-same"></span>
-              <span>A/B identical (amber outline)</span>
+              <span class="legend-label">A/B identical (amber outline)</span>
+              <div class="legend-controls">
+                <span id="abStatus" class="badge">-</span>
+                <label class="switch">
+                  <input id="mergeIdentical" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
             </div>
           </div>
           <p class="muted">
             These are hollow boxes for clarity; overlap can be visually compared by alignment.
             If A and B are identical and merge is enabled, we render a single amber outline.
           </p>
-        </div>
-
-        <div class="card">
-          <div class="label">Display</div>
-          <div class="toggle-list">
-            <label class="toggle">
-              <input id="showGt" type="checkbox" checked />
-              <span>Show ground truth</span>
-            </label>
-            <label class="toggle">
-              <input id="showRaw" type="checkbox" checked />
-              <span>Show Method A (Raw + Fuzzy)</span>
-            </label>
-            <label class="toggle">
-              <input id="showIndexed" type="checkbox" checked />
-              <span>Show Method B (Indexed)</span>
-            </label>
-            <label class="toggle">
-              <input id="mergeIdentical" type="checkbox" checked />
-              <span>Merge identical A/B into amber</span>
-            </label>
-          </div>
-          <div class="row">
-            <label>AB status</label>
-            <span id="abStatus" class="badge">-</span>
-          </div>
         </div>
 
         <div class="card">
