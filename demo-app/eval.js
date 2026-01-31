@@ -78,7 +78,7 @@ function updateMetrics(rawMetrics, indexedMetrics) {
 
 function clearOverlay() {
   if (!annotationManager) return;
-  const existing = annotationManager.getAnnotationsList?.() || [];
+  const existing = Array.from(annotationManager.getAnnotationsList?.() || []);
   for (const ann of existing) {
     try {
       if (ann?.getCustomData?.("eval_hl") === "1") {
