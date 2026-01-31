@@ -143,6 +143,19 @@ def _build_examples(ann_path: pathlib.Path, image_path: pathlib.Path) -> List[Di
             seen.add(key)
             unique_words.append(w)
         answer_words = unique_words
+        # Additional guard: drop duplicate boxes even if text differs.
+        seen_boxes: set[Tuple[float, float, float, float]] = set()
+        unique_by_box: List[Dict[str, Any]] = []
+        for w in answer_words:
+            box = w.get("box") or []
+            if not isinstance(box, list) or len(box) != 4:
+                continue
+            key = tuple(round(float(v), 2) for v in box)
+            if key in seen_boxes:
+                continue
+            seen_boxes.add(key)
+            unique_by_box.append(w)
+        answer_words = unique_by_box
         if not answer_words:
             continue
         answer_text = " ".join([w["text"] for w in answer_words]).strip()
@@ -266,7 +279,7 @@ def _boxes_from_pred(pages: List[Dict[str, Any]]) -> List[List[float]]:
             bb = _quad_to_bbox(quad)
             if bb:
                 out.append(bb)
-    return out
+    return _dedupe_boxes(out)
 
 
 def _box_iou(a: List[float], b: List[float]) -> float:
@@ -285,6 +298,24 @@ def _box_iou(a: List[float], b: List[float]) -> float:
     if union <= 0.0:
         return 0.0
     return inter / union
+
+
+def _dedupe_boxes(boxes: List[List[float]], *, decimals: int = 2) -> List[List[float]]:
+    seen: set[Tuple[float, float, float, float]] = set()
+    out: List[List[float]] = []
+    for box in boxes or []:
+        if not isinstance(box, list) or len(box) != 4:
+            continue
+        try:
+            vals = [float(v) for v in box]
+        except Exception:
+            continue
+        key = tuple(round(v, decimals) for v in vals)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(vals)
+    return out
 
 
 def _match_boxes(pred_boxes: List[List[float]], gt_boxes: List[List[float]], iou_thresh: float) -> Dict[str, Any]:
@@ -463,7 +494,8 @@ def main() -> None:
             doc_hash = _ensure_preprocess(pdf_path)
             doc_hash_cache[str(pdf_path)] = doc_hash
 
-        gt_boxes = [w["box"] for w in ex.get("answer_words", []) if isinstance(w.get("box"), list)]
+        gt_boxes_raw = [w["box"] for w in ex.get("answer_words", []) if isinstance(w.get("box"), list)]
+        gt_boxes = _dedupe_boxes(gt_boxes_raw)
 
         methods_out: Dict[str, Any] = {}
         for method in method_list:
