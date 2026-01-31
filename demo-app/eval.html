@@ -65,6 +65,16 @@
               </div>
             </div>
             <div class="legend-row">
+              <span class="swatch method-ab"></span>
+              <span class="legend-label">A/B overlays (master)</span>
+              <div class="legend-controls">
+                <label class="switch" title="Indeterminate means only A or B is selected">
+                  <input id="toggleAB" type="checkbox" checked />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+            <div class="legend-row">
               <span class="swatch method-a"></span>
               <span class="legend-label">Method A: Raw + Fuzzy (red outline)</span>
               <div class="legend-controls">
@@ -99,6 +109,7 @@
           <p class="muted">
             These are hollow boxes for clarity; overlap can be visually compared by alignment.
             If A and B are identical and merge is enabled, we render a single amber outline.
+            The A/B master shows a partial state when only one method is enabled.
           </p>
         </div>
 

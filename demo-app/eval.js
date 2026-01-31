@@ -26,6 +26,7 @@ const showRawEl = document.getElementById("showRaw");
 const showIndexedEl = document.getElementById("showIndexed");
 const mergeIdenticalEl = document.getElementById("mergeIdentical");
 const abStatusEl = document.getElementById("abStatus");
+const toggleABEl = document.getElementById("toggleAB");
 
 let viewerInstance = null;
 let documentViewer = null;
@@ -200,6 +201,22 @@ function boxesEqual(a, b) {
   return true;
 }
 
+function syncABMaster() {
+  if (!toggleABEl) return;
+  const a = showRawEl ? showRawEl.checked : false;
+  const b = showIndexedEl ? showIndexedEl.checked : false;
+  if (a && b) {
+    toggleABEl.checked = true;
+    toggleABEl.indeterminate = false;
+  } else if (!a && !b) {
+    toggleABEl.checked = false;
+    toggleABEl.indeterminate = false;
+  } else {
+    toggleABEl.checked = false;
+    toggleABEl.indeterminate = true;
+  }
+}
+
 function focusOnAnnotations(annotations, pageNo) {
   if (!annotations || !annotations.length || !viewerInstance || !documentViewer) return;
   const first = annotations[0];
@@ -295,6 +312,7 @@ function findExampleById(id) {
 
 function renderExample(ex, opts = { focus: true }) {
   if (!ex) return;
+  syncABMaster();
   setText(evalFieldLabelEl, ex.question);
   setText(evalExpectedValueEl, ex.expected_answer);
 
@@ -498,6 +516,14 @@ showIndexedEl?.addEventListener("change", () => {
   if (ex) renderExample(ex, { focus: false });
 });
 mergeIdenticalEl?.addEventListener("change", () => {
+  const ex = findExampleById(String(exampleSelectEl.value || ""));
+  if (ex) renderExample(ex, { focus: false });
+});
+toggleABEl?.addEventListener("change", () => {
+  const checked = toggleABEl.checked;
+  if (showRawEl) showRawEl.checked = checked;
+  if (showIndexedEl) showIndexedEl.checked = checked;
+  toggleABEl.indeterminate = false;
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: false });
 });

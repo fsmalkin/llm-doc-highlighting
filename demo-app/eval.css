@@ -3,6 +3,7 @@
   --method-a: #ff7b72;
   --method-b: #7aa2f7;
   --method-same: #f9e2af;
+  --method-ab: #c5c9d3;
 }
 
 .eval-wrap {
@@ -69,6 +70,10 @@
   color: var(--method-same);
 }
 
+.swatch.method-ab {
+  color: var(--method-ab);
+}
+
 .ab-grid {
   display: grid;
   grid-template-columns: 1fr repeat(4, 64px);
@@ -130,4 +135,13 @@
 
 .switch input:checked + .slider::before {
   transform: translateX(16px);
+}
+
+.switch input:indeterminate + .slider {
+  background: rgba(249, 226, 175, 0.3);
+  border-color: rgba(249, 226, 175, 0.7);
+}
+
+.switch input:indeterminate + .slider::before {
+  transform: translateX(8px);
 }
