@@ -103,6 +103,8 @@ def build_reading_view_lines(geom: Dict[str, Any]) -> Tuple[Dict[str, Dict[str, 
                 "page": page_no,
                 "text": str(w.get("text") or ""),
                 "quad": w.get("quad") if isinstance(w.get("quad"), list) else [],
+                "line_id": w.get("line_id"),
+                "sent_id": w.get("sent_id"),
             }
 
         raw_lines = page_obj.get("lines") or []
@@ -277,4 +279,3 @@ def span_to_word_ids(flat_word_ids: List[str], start_token: int, end_token: int)
     start = max(0, min(int(start_token), len(flat_word_ids) - 1))
     end = max(start, min(int(end_token), len(flat_word_ids) - 1))
     return [str(wid) for wid in flat_word_ids[start : end + 1]]
-
