@@ -25,6 +25,7 @@ const metricIndexedPrecisionEl = document.getElementById("metricIndexedPrecision
 const metricIndexedRecallEl = document.getElementById("metricIndexedRecall");
 const metricIndexedPass2El = document.getElementById("metricIndexedPass2");
 
+const showMergedEl = document.getElementById("showMerged");
 const showGtEl = document.getElementById("showGt");
 const showRawEl = document.getElementById("showRaw");
 const showIndexedEl = document.getElementById("showIndexed");
@@ -196,6 +197,57 @@ function dedupeBoxes(boxes) {
     out.push(b);
   }
   return out;
+}
+
+function mergeBoxesToLines(boxes) {
+  const norm = normalizeBoxes(boxes);
+  if (!norm.length) return [];
+  const heights = norm.map((b) => Math.max(1, b[3] - b[1]));
+  const sortedHeights = heights.slice().sort((a, b) => a - b);
+  const mid = Math.floor(sortedHeights.length / 2);
+  const medianHeight =
+    sortedHeights.length % 2 === 0 ? (sortedHeights[mid - 1] + sortedHeights[mid]) / 2 : sortedHeights[mid];
+  const yTol = Math.max(2, medianHeight * 0.6);
+  const gapTol = Math.max(10, medianHeight * 2);
+
+  const items = norm
+    .map((b) => ({ box: b, y: (b[1] + b[3]) / 2, x: b[0] }))
+    .sort((a, b) => (a.y === b.y ? a.x - b.x : a.y - b.y));
+
+  const clusters = [];
+  for (const item of items) {
+    const last = clusters[clusters.length - 1];
+    if (last && Math.abs(item.y - last.centerY) <= yTol) {
+      last.items.push(item.box);
+      last.centerY = (last.centerY * (last.items.length - 1) + item.y) / last.items.length;
+    } else {
+      clusters.push({ centerY: item.y, items: [item.box] });
+    }
+  }
+
+  const merged = [];
+  for (const cluster of clusters) {
+    const boxesSorted = cluster.items.slice().sort((a, b) => a[0] - b[0]);
+    let segment = null;
+    for (const b of boxesSorted) {
+      if (!segment) {
+        segment = { x0: b[0], y0: b[1], x1: b[2], y1: b[3] };
+        continue;
+      }
+      const gap = b[0] - segment.x1;
+      if (gap > gapTol) {
+        merged.push([segment.x0, segment.y0, segment.x1, segment.y1]);
+        segment = { x0: b[0], y0: b[1], x1: b[2], y1: b[3] };
+      } else {
+        segment.x0 = Math.min(segment.x0, b[0]);
+        segment.y0 = Math.min(segment.y0, b[1]);
+        segment.x1 = Math.max(segment.x1, b[2]);
+        segment.y1 = Math.max(segment.y1, b[3]);
+      }
+    }
+    if (segment) merged.push([segment.x0, segment.y0, segment.x1, segment.y1]);
+  }
+  return merged;
 }
 
 function dedupeWords(words) {
@@ -427,23 +479,27 @@ function renderExample(ex, opts = { focus: true }) {
   const gtBoxes = dedupeBoxes((ex.expected_words || []).map((w) => w.box).filter(Boolean));
   const rawBoxes = dedupeBoxes(collectBoxes(rawData));
   const indexedBoxes = dedupeBoxes(collectBoxes(indexedData));
+  const useMerged = showMergedEl ? showMergedEl.checked : false;
+  const gtRender = useMerged ? mergeBoxesToLines(gtBoxes) : gtBoxes;
+  const rawRender = useMerged ? mergeBoxesToLines(rawBoxes) : rawBoxes;
+  const indexedRender = useMerged ? mergeBoxesToLines(indexedBoxes) : indexedBoxes;
   const pageNo = rawData?.mapped?.pages?.[0]?.page || indexedData?.mapped?.pages?.[0]?.page || 1;
 
   const docId = ex.doc_id;
   const url = `/api/eval_pdf?doc_id=${encodeURIComponent(docId)}`;
   if (!viewerInstance || !documentViewer) {
-    pendingOverlay = { gt: gtBoxes, raw: rawBoxes, indexed: indexedBoxes, page: pageNo, focus: opts.focus };
+    pendingOverlay = { gt: gtRender, raw: rawRender, indexed: indexedRender, page: pageNo, focus: opts.focus };
     currentDocId = docId;
     return;
   }
   if (currentDocId !== docId) {
     currentDocId = docId;
-    pendingOverlay = { gt: gtBoxes, raw: rawBoxes, indexed: indexedBoxes, page: pageNo, focus: opts.focus };
+    pendingOverlay = { gt: gtRender, raw: rawRender, indexed: indexedRender, page: pageNo, focus: opts.focus };
     try {
       viewerInstance.UI.loadDocument(url);
     } catch {}
   } else {
-    const anns = renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) || [];
+    const anns = renderOverlay(gtRender, rawRender, indexedRender, pageNo) || [];
     if (opts.focus) {
       focusOnAnnotations(anns, pageNo);
     }
@@ -644,6 +700,10 @@ exampleSelectEl?.addEventListener("change", () => {
   if (ex) renderExample(ex, { focus: true });
 });
 showGtEl?.addEventListener("change", () => {
+  const ex = findExampleById(String(exampleSelectEl.value || ""));
+  if (ex) renderExample(ex, { focus: false });
+});
+showMergedEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: false });
 });

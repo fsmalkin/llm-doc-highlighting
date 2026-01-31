@@ -67,13 +67,23 @@
           <div class="label">Scoring definition</div>
           <p class="muted">
             Scores use strict word-box overlap (IoU threshold 0.5) on deduped boxes. Overlays are visual and
-            can look identical even when strict scores differ.
+            can look identical even when strict scores differ. The merged-line toggle only changes display.
           </p>
         </div>
 
         <div class="card">
           <div class="label">Legend</div>
           <div class="legend">
+            <div class="legend-row">
+              <span class="swatch method-ab"></span>
+              <span class="legend-label">Merged line view (visual only)</span>
+              <div class="legend-controls">
+                <label class="switch">
+                  <input id="showMerged" type="checkbox" />
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
             <div class="legend-row">
               <span class="swatch gt"></span>
               <span class="legend-label">Ground truth (gold/green outline)</span>
