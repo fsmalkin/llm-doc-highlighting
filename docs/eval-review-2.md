@@ -4,6 +4,7 @@ Run: `run_20260131_102617.json`
 
 These cases are the lowest IoU examples (strict word-box overlap).
 Default demo URL is `http://127.0.0.1:8004/` (update links if you override `DEMO_PORT`).
+Some cases are likely GT errors; log corrections under `data/gt_corrections/funsd/`.
 
 ## Cases
 

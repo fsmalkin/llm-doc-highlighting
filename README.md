@@ -85,14 +85,18 @@ Walkthrough:
 Example question:
 - What is the date of visit?
 
-## Evaluation (FUNSD)
+## FUNSD (demo subset + GT corrections)
+
+FUNSD has known GT issues (label/value mismatches, missing boxes, incorrect values).
+We treat FUNSD as a small demo dataset for open-ended QA + grounding and catalog corrections under:
+`data/gt_corrections/funsd/` (see `docs/gt-corrections.md`).
 
 The FUNSD dataset is not included in git. Use the helper to download and extract it:
 ```bash
 python scripts\funsd_download.py --dest data\funsd
 ```
 
-Run a small A/B sample (indexed vs raw+fuzzy):
+Run a small A/B sample (indexed vs raw+fuzzy) for qualitative inspection:
 ```bash
 python scripts\funsd_eval.py --split test --limit 10 --compare --prompt-mode field_label
 ```
@@ -104,6 +108,7 @@ Outputs:
 Notes:
 - The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
 - FUNSD prompts treat the field label as the key and ask for the corresponding value span.
+- Because GT has issues, treat FUNSD metrics as directional only. Use the corrections catalog when reviewing errors.
 - The demo app includes a Stats page at `/stats.html` for aggregate run metrics and an Eval Review page at `/eval.html` with a run selector (or deep link via `?run=`).
 
 ## Docs
@@ -112,5 +117,7 @@ Notes:
 - `docs/pipeline.md` - Phase 1 and Phase 2, inputs/outputs, artifacts
 - `docs/data-model.md` - canonical JSON schema and invariants
 - `docs/runbook.md` - end-to-end runs and expected artifacts
+- `docs/gt-corrections.md` - GT correction workflow (CVAT local)
+- `docs/gt-corrections-schema.md` - correction JSON schema
 - `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach

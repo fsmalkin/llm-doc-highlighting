@@ -93,3 +93,7 @@ Review in the demo UI:
 - Start the demo server (`python scripts\demo_server.py`)
 - Open `/stats.html` on the demo host to review aggregate statistics.
 - Open `/eval.html` on the demo host to inspect per-example overlays (use the run selector or deep link via `?run=`).
+
+Notes on GT quality:
+- FUNSD has known GT issues. Track corrections under `data/gt_corrections/funsd/`.
+- See `docs/gt-corrections.md` for the CVAT-based workflow.

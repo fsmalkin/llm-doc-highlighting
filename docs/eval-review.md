@@ -10,6 +10,9 @@ Prereq:
 Run used for links:
 - `run_20260131_102617.json`
 
+Note:
+- Some cases below may be GT errors (not model errors). Log corrections under `data/gt_corrections/funsd/`.
+
 ## Mistakes observed (eval perspective)
 
 - Strict scoring vs visual overlap: the metrics use strict word-box IoU, but overlays can look "right" even when strict IoU is low.

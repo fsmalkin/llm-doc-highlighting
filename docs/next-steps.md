@@ -1,41 +1,45 @@
-# Next Steps (Experiments)
+# Next Steps (Iterative)
 
-The next step is evaluation, not new methods. We will run small samples first to validate the end-to-end pipeline (inputs -> runs -> metrics -> report) before scaling.
+We are shifting to a GT-first loop before scaling evaluations.
 
-## 1) Iterative evaluation plan
+## 1) GT corrections pipeline (CVAT local)
 
-Goal: build confidence in data collection, metrics, and reporting without expensive full runs.
+Goal: build a small, repeatable loop to capture GT errors with minimal effort.
 
 Phases:
-- **Phase A (smoke sample):** tiny sample per dataset to validate parsing, caching, and report generation. Run both methods (indexed vs raw+fuzzy) on the same examples.
-- **Phase B (pilot):** larger sample to confirm stability, cost, and failure modes; continue A/B comparison.
-- **Phase C (scale):** full dataset once Phase A/B are stable and acceptable.
+- Phase A: define schema + docs
+- Phase B: annotate 1 to 3 docs in CVAT and commit corrections
+- Phase C: add a small importer script and repeat in small batches
+
+Deliverables:
+- `docs/gt-corrections.md`
+- `docs/gt-corrections-schema.md`
+- `data/gt_corrections/<dataset>/` JSONs
+
+## 2) FUNSD demo subset (open-ended QA)
+
+Goal: curate a small FUNSD set for open-ended QA + grounding demos and document GT issues.
+
+Deliverables:
+- A short list of demo docs (doc ids + notes)
+- README updates describing FUNSD limitations
+
+## 3) Evaluation on other datasets (iterative)
+
+Goal: run small samples first, then scale only after data collection and reporting look solid.
 
 Metrics to capture:
-- span validity rate (LLM returned a usable span)
-- mapping success rate (span -> word_ids -> geometry)
-- accuracy (exact/partial overlap)
-- latency (end-to-end + per pass)
-- token cost (prompt + completion)
-- A/B deltas (indexed vs raw+fuzzy, pass2 fallback rate)
+- span validity rate
+- mapping success rate
+- overlap accuracy
+- latency
+- token cost
 
-## 2) Evaluation hygiene
+## 4) Eval Review UX
 
-To avoid wasted spend or noisy results:
-- lock config and model versions per run
-- store run metadata (dataset name, sample size, model, OCR/rails settings)
-- keep a clear, reproducible report format
- - use explicit prompt framing (field label -> value) for FUNSD to avoid ambiguity
-
-## 3) Optional experiments (after baseline is stable)
-
-- LLM OCR: evaluate text recall, bbox stability, and cost before replacing current rails.
-
-## 4) Eval Review UX (demo viewer)
-
-Goal: make it easy to visually inspect GT vs predicted boxes and overlap per example.
+Goal: make it easy to inspect GT vs predicted boxes and read corrections.
 
 Minimum features:
-- List of examples with pass/fail and IoU threshold filter
-- Viewer overlay: GT boxes (green), predicted boxes (blue), overlap (teal hatch)
-- Side panel: field label, expected value, model answer, error reason
+- Clear GT vs predicted overlays
+- Links to corrections for a selected example
+- Small-batch results first

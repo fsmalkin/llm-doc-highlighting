@@ -3,25 +3,34 @@
 This is a short, execution-focused roadmap for the llm-doc-highlighting repo.
 It is intentionally scoped to the next few concrete milestones.
 
-## P1 - Benchmarks (iterative)
+## P0 - GT corrections + FUNSD demo subset (iterative)
 
-Goal: quantify baseline quality and failure modes without committing to costly full runs until the pipeline is stable.
+Goal: document GT errors, capture corrected values, and curate a small FUNSD demo set for open-ended QA.
 
-Benchmarks
-- FUNSD (form-like documents, key/value heavy)
-- A long-form dataset (multi-page prose) to stress span accuracy at length
-
-Outputs
-- An evaluation harness that runs end-to-end on small samples first
-- A/B comparison: indexed (token-based) vs raw+fuzzy (raw + raw_extra, with pass2 fallback)
-- Metrics: span validity rate, mapping success rate, accuracy (exact/partial), latency, token cost
-- A short report per dataset with failure modes and data quality notes
-- An Eval Review tab in the demo viewer with GT vs predicted overlays
-- A clear scale-up plan once small-sample runs succeed (larger samples, full dataset)
+Milestones
+- Add GT correction schema + docs
+- Set up local CVAT workflow and a tiny pilot (1 to 3 docs)
+- Store first correction JSONs in `data/gt_corrections/funsd/`
+- Document FUNSD GT issues and where corrections are cataloged
+- Curate a small FUNSD demo subset for open-ended QA + grounding
 
 Notes
-- Rails remain required for all evaluations; Vision rails are preferred when credentials are present.
-- FUNSD prompts treat the field label as the key and ask for the filled value (natural language, but explicit).
+- Corrections are small JSON files only; do not commit dataset images.
+- Keep the workflow iterative: small batches first.
+
+## P1 - Evaluation pipeline (iterative)
+
+Goal: move to reliable, cost-conscious evaluation once GT corrections are in place.
+
+Benchmarks
+- One long-form dataset (multi-page prose) for span accuracy at length
+- Additional form-like dataset (if FUNSD GT issues make it unsuitable for benchmarking)
+
+Outputs
+- A/B comparison: indexed (token-based) vs raw+fuzzy (raw + raw_extra, with pass2 fallback)
+- Metrics: span validity, mapping success, overlap accuracy, latency, token cost
+- Per-dataset report with failure modes and data quality notes
+- Eval Review UI for visual inspection
 
 ## Parking lot / future
 

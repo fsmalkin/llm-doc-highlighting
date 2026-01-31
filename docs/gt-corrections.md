@@ -1,0 +1,50 @@
+# Ground truth corrections
+
+This repo tracks known GT errors and corrected values so evaluation results are explainable and auditable.
+We use CVAT locally to annotate bounding boxes and then store corrections in a small, dataset-agnostic JSON format.
+
+## Goals
+- Examine eval-reported errors against GT
+- Record corrected values + bboxes with short notes
+- Keep corrections in-repo (small JSON, no dataset images)
+- Reuse the same workflow for other datasets
+
+## Where corrections live
+
+- `data/gt_corrections/<dataset>/<doc_id>.json`
+- Schema: `docs/gt-corrections-schema.md`
+
+## Coordinate system
+
+- `bbox` uses `[x0, y0, x1, y1]` in pixel units of the source page image/PDF
+- Origin is top-left; y increases downward
+- For FUNSD, the PDF pages are created directly from the source images, so image coords align with the PDF
+
+## Iterative workflow (small batches)
+
+1) Pick a tiny batch (1 to 3 docs) and create a CVAT task.
+2) Annotate only the corrections you need (not full relabels).
+3) Export CVAT annotations (no images) and convert to repo JSON.
+4) Commit the corrections.
+5) Repeat with the next small batch.
+
+## CVAT local (Docker)
+
+We use CVAT locally to keep data on-device. This is a lightweight, repeatable setup.
+
+High-level steps:
+- Start CVAT with Docker Compose
+- Create a project for the dataset (e.g., FUNSD)
+- Upload the images (or the PDFs for single-page docs)
+- Add a single label (e.g., `gt_fix`) with attributes for `field_label`, `value`, and `notes`
+- Draw rectangles for corrected values
+- Export as "CVAT for images 1.1" (annotations.xml)
+
+We will add a small importer script next so the CVAT export can be converted directly into
+`data/gt_corrections/<dataset>/<doc_id>.json` records.
+
+## FUNSD note
+
+FUNSD has GT issues (label/value mismatches, incorrect values, missing boxes).
+We treat FUNSD as a demo dataset for open-ended QA and grounding, and we catalog corrections under:
+`data/gt_corrections/funsd/`
