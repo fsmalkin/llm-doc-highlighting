@@ -120,13 +120,29 @@ def _build_examples(ann_path: pathlib.Path, image_path: pathlib.Path) -> List[Di
         if not label_text:
             continue
         linked = adjacency.get(eid, [])
-        answer_ids = [lid for lid in linked if str(entities.get(lid, {}).get("label") or "").lower() == "answer"]
+        answer_ids = [
+            lid
+            for lid in linked
+            if str(entities.get(lid, {}).get("label") or "").lower() == "answer"
+        ]
+        # Deduplicate in case linking pairs appear twice (question + answer entities).
+        answer_ids = list(dict.fromkeys(answer_ids))
         if not answer_ids:
             continue
         answer_words: List[Dict[str, Any]] = []
         for aid in answer_ids:
             answer_words.extend(_entity_words(entities.get(aid, {})))
         answer_words = _sort_words(answer_words)
+        # Deduplicate identical word boxes to avoid doubled expected values.
+        seen = set()
+        unique_words: List[Dict[str, Any]] = []
+        for w in answer_words:
+            key = (w.get("text"), tuple(w.get("box") or []))
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_words.append(w)
+        answer_words = unique_words
         if not answer_words:
             continue
         answer_text = " ".join([w["text"] for w in answer_words]).strip()
