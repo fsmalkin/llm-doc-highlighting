@@ -45,6 +45,7 @@ let pendingOverlay = null;
 let currentRunName = "";
 let pendingSelection = null;
 let pendingFocusTag = null;
+let lastRender = null;
 
 function setText(el, text) {
   if (!el) return;
@@ -344,6 +345,41 @@ function focusOnAnnotations(annotations, pageNo) {
   });
 }
 
+function focusOnBoxes(boxes, pageNo) {
+  if (!boxes || !boxes.length || !documentViewer || !Core?.Math?.Rect) return false;
+  const rect = boxes.reduce((acc, b) => {
+    const x0 = Number(b?.[0] ?? 0);
+    const y0 = Number(b?.[1] ?? 0);
+    const x1 = Number(b?.[2] ?? 0);
+    const y1 = Number(b?.[3] ?? 0);
+    if (!acc) return { x0, y0, x1, y1 };
+    return {
+      x0: Math.min(acc.x0, x0),
+      y0: Math.min(acc.y0, y0),
+      x1: Math.max(acc.x1, x1),
+      y1: Math.max(acc.y1, y1),
+    };
+  }, null);
+  if (!rect) return false;
+  try {
+    if (viewerInstance?.UI?.setZoomLevel) {
+      viewerInstance.UI.setZoomLevel(2);
+    } else if (documentViewer?.setZoomLevel) {
+      documentViewer.setZoomLevel(2);
+    }
+  } catch {}
+  try {
+    documentViewer.setCurrentPage?.(pageNo || 1);
+  } catch {}
+  requestAnimationFrame(() => {
+    try {
+      const viewRect = new Core.Math.Rect(rect.x0, rect.y0, rect.x1 - rect.x0, rect.y1 - rect.y0);
+      documentViewer.setViewRect(viewRect, true, true);
+    } catch {}
+  });
+  return true;
+}
+
 function getAnnotationsByTag(tag) {
   if (!annotationManager) return [];
   const list = Array.from(annotationManager.getAnnotationsList?.() || []);
@@ -361,6 +397,20 @@ function focusByTag(tag) {
   const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
   if ((tag === "raw" || tag === "indexed") && showRaw && showIndexed) {
     resolvedTag = "ab";
+  }
+  if (lastRender && lastRender.page) {
+    const renderBoxes =
+      resolvedTag === "gt"
+        ? lastRender.gt
+        : resolvedTag === "raw"
+        ? lastRender.raw
+        : resolvedTag === "indexed"
+        ? lastRender.indexed
+        : lastRender.ab;
+    if (focusOnBoxes(renderBoxes, lastRender.page)) {
+      pendingFocusTag = null;
+      return;
+    }
   }
   let anns = getAnnotationsByTag(resolvedTag);
   if (!anns.length && resolvedTag !== tag) {
@@ -542,6 +592,8 @@ function renderExample(ex, opts = { focus: true }) {
   const gtRender = useMerged ? mergeBoxesToLines(gtBoxes) : gtBoxes;
   const rawRender = useMerged ? mergeBoxesToLines(rawBoxes) : rawBoxes;
   const indexedRender = useMerged ? mergeBoxesToLines(indexedBoxes) : indexedBoxes;
+  const abRender = dedupeBoxes([...(rawRender || []), ...(indexedRender || [])]);
+  lastRender = { gt: gtRender, raw: rawRender, indexed: indexedRender, ab: abRender, page: pageNo };
   const pageNo = rawData?.mapped?.pages?.[0]?.page || indexedData?.mapped?.pages?.[0]?.page || 1;
 
   const docId = ex.doc_id;
