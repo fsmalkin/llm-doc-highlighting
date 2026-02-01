@@ -1,4 +1,4 @@
-﻿"""
+"""
 Seed CVAT tasks for GT correction with per-doc prompts.
 
 Default: parse docs/eval-review-2.md (bad cases) and create one task per doc.
@@ -203,7 +203,7 @@ def _render_prompt_image(doc_id: str, cases: List[dict], out_dir: Path) -> Path:
         draw.text((margin, y), line, fill="black", font=font)
         y += line_height
 
-    out_path = out_dir / f"{doc_id}_prompt.png"
+    out_path = out_dir / f"0000__prompt__{doc_id}.png"
     img.save(out_path)
     return out_path
 
@@ -328,6 +328,8 @@ def main() -> None:
                 str(project_id),
                 "--image_quality",
                 "100",
+                "--sorting-method",
+                "predefined",
             ]
         )
         task_id = int(out.splitlines()[-1])

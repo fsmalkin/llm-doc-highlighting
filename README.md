@@ -109,7 +109,7 @@ Notes:
 - The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
 - FUNSD prompts treat the field label as the key and ask for the corresponding value span.
 - Because GT has issues, treat FUNSD metrics as directional only. Use the corrections catalog when reviewing errors.
-- The demo app includes a Stats page at `/stats.html` for aggregate run metrics and an Eval Review page at `/eval.html` with a run selector (or deep link via `?run=`).
+- The demo app includes a Stats page at `/stats.html`, an Eval Review page at `/eval.html`, and a GT Corrections page at `/gt-review.html`.
 
 ## Docs
 
@@ -117,7 +117,7 @@ Notes:
 - `docs/pipeline.md` - Phase 1 and Phase 2, inputs/outputs, artifacts
 - `docs/data-model.md` - canonical JSON schema and invariants
 - `docs/runbook.md` - end-to-end runs and expected artifacts
-- `docs/gt-corrections.md` - GT correction workflow (CVAT local)
+- `docs/gt-corrections.md` - GT correction workflow (in-repo UI, CVAT optional)
 - `docs/gt-corrections-schema.md` - correction JSON schema
 - `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach

@@ -36,6 +36,11 @@ ARTIFACTS_ROOT = REPO_ROOT / "artifacts" / "demo"
 DEFAULT_MODEL = "gpt-5-mini"
 REPORTS_ROOT = REPO_ROOT / "reports" / "funsd"
 FUNSD_PDF_ROOT = REPO_ROOT / "data" / "funsd" / "pdf"
+FUNSD_IMAGE_ROOT = REPO_ROOT / "data" / "funsd" / "raw" / "dataset" / "testing_data" / "images"
+GT_CORRECTIONS_ROOT = REPO_ROOT / "data" / "gt_corrections" / "funsd"
+EVAL_REVIEW_PATH = REPO_ROOT / "docs" / "eval-review-2.md"
+
+_EVAL_CACHE: Dict[str, Any] = {"mtime": None, "docs": [], "prompts": {}}
 
 
 def _load_env(dotenv_paths: list[pathlib.Path]) -> None:
@@ -174,6 +179,79 @@ def _slugify(text: str) -> str:
     return clean[:64] or "query"
 
 
+def _load_eval_prompts() -> Tuple[list[Dict[str, Any]], Dict[str, list[Dict[str, Any]]]]:
+    if not EVAL_REVIEW_PATH.exists():
+        return [], {}
+    mtime = EVAL_REVIEW_PATH.stat().st_mtime
+    if _EVAL_CACHE.get("mtime") == mtime:
+        return _EVAL_CACHE.get("docs", []), _EVAL_CACHE.get("prompts", {})
+
+    run_name = ""
+    cases: list[Dict[str, Any]] = []
+    current: Dict[str, Any] | None = None
+    for raw in EVAL_REVIEW_PATH.read_text(encoding="utf-8").splitlines():
+        line = raw.strip()
+        if line.startswith("Run:"):
+            match = re.search(r"`([^`]+)`", line)
+            if match:
+                run_name = match.group(1)
+            continue
+        match = re.match(r"^\d+\)\s+(.*)$", line)
+        if match:
+            if current:
+                cases.append(current)
+            current = {"field_label": match.group(1).strip(), "run": run_name}
+            continue
+        if not current:
+            continue
+        if line.startswith("- Doc:"):
+            current["doc_id"] = line.split(":", 1)[1].strip()
+        elif line.startswith("- Example id:"):
+            current["example_id"] = line.split(":", 1)[1].strip()
+        elif line.startswith("- Expected:"):
+            current["expected"] = line.split(":", 1)[1].strip()
+        elif line.startswith("- Raw:"):
+            current["raw"] = line.split(":", 1)[1].strip()
+        elif line.startswith("- Indexed:"):
+            current["indexed"] = line.split(":", 1)[1].strip()
+        elif line.startswith("- Link:"):
+            link = line.split(":", 1)[1].strip()
+            current["link"] = link
+            try:
+                parsed = urllib.parse.urlparse(link)
+                current["eval_url_params"] = parsed.query
+            except Exception:
+                pass
+    if current:
+        cases.append(current)
+
+    prompts: Dict[str, list[Dict[str, Any]]] = {}
+    for case in cases:
+        doc_id = case.get("doc_id")
+        if not doc_id:
+            continue
+        prompts.setdefault(str(doc_id), []).append(case)
+
+    docs = [{"doc_id": doc_id, "prompt_count": len(items)} for doc_id, items in prompts.items()]
+    docs = sorted(docs, key=lambda item: item["doc_id"])
+
+    _EVAL_CACHE.update({"mtime": mtime, "docs": docs, "prompts": prompts})
+    return docs, prompts
+
+
+def _find_funsd_image(doc_id: str) -> pathlib.Path | None:
+    if not FUNSD_IMAGE_ROOT.exists():
+        return None
+    for ext in (".png", ".jpg", ".jpeg", ".tif", ".tiff"):
+        candidate = FUNSD_IMAGE_ROOT / f"{doc_id}{ext}"
+        if candidate.exists():
+            return candidate
+    for candidate in FUNSD_IMAGE_ROOT.glob(f"{doc_id}.*"):
+        if candidate.is_file():
+            return candidate
+    return None
+
+
 def _run_llm(
     question: str,
     *,
@@ -275,6 +353,18 @@ class DemoHandler(SimpleHTTPRequestHandler):
         if raw_path == "/api/eval_pdf":
             self._handle_eval_pdf()
             return
+        if raw_path == "/api/gt/docs":
+            self._handle_gt_docs()
+            return
+        if raw_path == "/api/gt/prompts":
+            self._handle_gt_prompts()
+            return
+        if raw_path == "/api/gt/image":
+            self._handle_gt_image()
+            return
+        if raw_path == "/api/gt/corrections":
+            self._handle_gt_corrections_get()
+            return
         if raw_path.startswith("/api/"):
             self._send_json({"ok": False, "error": "Use POST"}, status=HTTPStatus.METHOD_NOT_ALLOWED)
             return
@@ -296,6 +386,9 @@ class DemoHandler(SimpleHTTPRequestHandler):
             return
         if self.path == "/api/ask_raw":
             self._handle_ask_raw()
+            return
+        if self.path == "/api/gt/corrections":
+            self._handle_gt_corrections_post()
             return
         self._send_json({"ok": False, "error": "Not found"}, status=HTTPStatus.NOT_FOUND)
 
@@ -459,6 +552,132 @@ class DemoHandler(SimpleHTTPRequestHandler):
                 self.end_headers()
                 return
             self._send_file(pdf_path, content_type="application/pdf")
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_gt_docs(self) -> None:
+        try:
+            docs, _prompts = _load_eval_prompts()
+            self._send_json({"ok": True, "docs": docs})
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_gt_prompts(self) -> None:
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query or "")
+            doc_id = params.get("doc", [""])[0].strip()
+            if not doc_id or "/" in doc_id or "\\" in doc_id:
+                self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            _docs, prompts = _load_eval_prompts()
+            items = prompts.get(doc_id, [])
+            self._send_json({"ok": True, "doc_id": doc_id, "prompts": items})
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_gt_image(self) -> None:
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query or "")
+            doc_id = params.get("doc", [""])[0].strip()
+            if not doc_id or "/" in doc_id or "\\" in doc_id:
+                self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            img_path = _find_funsd_image(doc_id)
+            if not img_path:
+                self._send_json({"ok": False, "error": "Image not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+            content_type = mimetypes.guess_type(img_path.name)[0] or "image/png"
+            self._send_file(img_path, content_type=content_type)
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_gt_corrections_get(self) -> None:
+        try:
+            parsed = urllib.parse.urlparse(self.path)
+            params = urllib.parse.parse_qs(parsed.query or "")
+            doc_id = params.get("doc", [""])[0].strip()
+            if not doc_id or "/" in doc_id or "\\" in doc_id:
+                self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            path = GT_CORRECTIONS_ROOT / f"{doc_id}.json"
+            if not path.exists():
+                self._send_json({"ok": True, "exists": False, "payload": {"doc_id": doc_id, "items": []}})
+                return
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            self._send_json({"ok": True, "exists": True, "payload": payload})
+        except Exception as exc:
+            self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
+
+    def _handle_gt_corrections_post(self) -> None:
+        try:
+            body = self._read_json()
+            doc_id = str(body.get("doc_id") or "").strip()
+            if not doc_id or "/" in doc_id or "\\" in doc_id:
+                self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            items = body.get("items") or []
+            if not isinstance(items, list):
+                self._send_json({"ok": False, "error": "Items must be a list"}, status=HTTPStatus.BAD_REQUEST)
+                return
+            img_path = _find_funsd_image(doc_id)
+            if not img_path:
+                self._send_json({"ok": False, "error": "Image not found"}, status=HTTPStatus.NOT_FOUND)
+                return
+
+            cleaned: list[Dict[str, Any]] = []
+            dropped = 0
+            for item in items:
+                if not isinstance(item, dict):
+                    dropped += 1
+                    continue
+                field_label = str(item.get("field_label") or "").strip()
+                value = str(item.get("value") or "").strip()
+                bbox = item.get("bbox")
+                if not field_label or not value or not isinstance(bbox, list) or len(bbox) != 4:
+                    dropped += 1
+                    continue
+                try:
+                    bbox_vals = [round(float(v), 2) for v in bbox]
+                except Exception:
+                    dropped += 1
+                    continue
+                cleaned_item: Dict[str, Any] = {
+                    "field_label": field_label,
+                    "value": value,
+                    "bbox": bbox_vals,
+                }
+                if item.get("value_type"):
+                    cleaned_item["value_type"] = str(item.get("value_type"))
+                if item.get("notes"):
+                    cleaned_item["notes"] = str(item.get("notes"))
+                if item.get("item_id"):
+                    cleaned_item["item_id"] = str(item.get("item_id"))
+                if item.get("links"):
+                    cleaned_item["links"] = item.get("links")
+                if item.get("source"):
+                    cleaned_item["source"] = item.get("source")
+                else:
+                    cleaned_item["source"] = {"tool": "gt-review-ui", "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+                cleaned.append(cleaned_item)
+
+            if not cleaned:
+                self._send_json({"ok": False, "error": "No valid items to save"}, status=HTTPStatus.BAD_REQUEST)
+                return
+
+            payload = {
+                "schema_version": 1,
+                "dataset": "funsd",
+                "doc_id": doc_id,
+                "doc_page": 1,
+                "doc_source": {"type": "image", "path": img_path.name},
+                "items": cleaned,
+            }
+            GT_CORRECTIONS_ROOT.mkdir(parents=True, exist_ok=True)
+            out_path = GT_CORRECTIONS_ROOT / f"{doc_id}.json"
+            out_path.write_text(json.dumps(payload, ensure_ascii=True, indent=2), encoding="utf-8")
+            self._send_json({"ok": True, "saved": str(out_path), "item_count": len(cleaned), "dropped": dropped})
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 

@@ -1,7 +1,7 @@
 # Ground truth corrections
 
 This repo tracks known GT errors and corrected values so evaluation results are explainable and auditable.
-We use CVAT locally to annotate bounding boxes and then store corrections in a small, dataset-agnostic JSON format.
+We use a lightweight in-repo UI to annotate bounding boxes and store corrections in a small, dataset-agnostic JSON format.
 
 ## Goals
 - Examine eval-reported errors against GT
@@ -22,42 +22,31 @@ We use CVAT locally to annotate bounding boxes and then store corrections in a s
 
 ## Iterative workflow (small batches)
 
-1) Pick a tiny batch (1 to 3 docs) and create a CVAT task.
+1) Pick a tiny batch (1 to 3 docs) and open the GT Corrections page.
 2) Annotate only the corrections you need (not full relabels).
-3) Export CVAT annotations (no images) and convert to repo JSON.
+3) Save corrections directly into `data/gt_corrections/`.
 4) Commit the corrections.
 5) Repeat with the next small batch.
 
-## CVAT local (Docker)
+## GT Corrections UI (recommended)
 
-We use CVAT locally to keep data on-device. This is a lightweight, repeatable setup.
+Open the local demo server and navigate to:
+`/gt-review.html`
 
-High-level steps:
-- Start CVAT with Docker Compose
-- Create a project for the dataset (e.g., FUNSD)
-- Upload the images (or the PDFs for single-page docs)
-- Add a single label: `gt_fix`
-  - Attributes (all strings):
-    - `field_label` (required)
-    - `value` (required)
-    - `value_type` (optional)
-    - `notes` (optional)
-    - `eval_example_id` (optional)
-    - `eval_run` (optional)
-    - `eval_url_params` (optional)
-- Draw rectangles for corrected values
-- Export as \"CVAT for images 1.1\" (annotations.xml)
+The UI:
+- Pulls prompts from `docs/eval-review-2.md`
+- Shows the document image
+- Lets you draw a bbox and fill value/notes
+- Saves JSON into `data/gt_corrections/<dataset>/<doc_id>.json`
 
-In-tool instructions:
+## CVAT (legacy, optional)
+
+CVAT can still be used if you need advanced tooling, but it is no longer required.
+See `docs/cvat-guide.md` and `scripts/cvat_seed_tasks.py` if you want to use CVAT.
+
+In-tool instructions (CVAT):
 - Open the task/job and click the \"Guide\" panel in CVAT.
 - The guide mirrors `docs/cvat-guide.md` and contains the labeling checklist.
-- Each task has a per-document prompt section generated from `docs/eval-review-2.md`.
-- The first frame in each task is a prompt card image; move to the next frame to annotate.
-
-To (re)create per-document tasks with prompts:
-```bash
-python scripts\\cvat_seed_tasks.py --reset
-```
 
 Import the export into repo JSON:
 ```bash
