@@ -118,6 +118,7 @@ Notes:
 - `docs/data-model.md` - canonical JSON schema and invariants
 - `docs/runbook.md` - end-to-end runs and expected artifacts
 - `docs/gt-corrections.md` - GT correction workflow (in-repo UI, CVAT optional)
+- `docs/gt-review-guide.md` - GT corrections UI guide with screenshots
 - `docs/gt-corrections-schema.md` - correction JSON schema
 - `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach
