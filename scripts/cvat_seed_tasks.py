@@ -10,10 +10,12 @@ import base64
 import json
 import re
 import subprocess
+import textwrap
 from pathlib import Path
 from typing import Dict, List
 import urllib.request
 from urllib.parse import urlparse
+from PIL import Image, ImageDraw, ImageFont
 
 
 def _api_request(method: str, url: str, user: str, password: str, payload: dict | None = None) -> dict:
@@ -135,6 +137,77 @@ def _build_guide(doc_id: str, cases: List[dict], base_guide: str) -> str:
     return base_guide.rstrip() + "\n\n---\n\n" + "\n".join(lines).strip() + "\n"
 
 
+def _safe_ascii(text: str) -> str:
+    return text.encode("ascii", "replace").decode("ascii")
+
+
+def _render_prompt_image(doc_id: str, cases: List[dict], out_dir: Path) -> Path:
+    out_dir.mkdir(parents=True, exist_ok=True)
+    width = 1400
+    margin = 48
+    font_size = 24
+    font = None
+    try:
+        font = ImageFont.truetype("C:\\Windows\\Fonts\\arial.ttf", font_size)
+    except Exception:
+        font = ImageFont.load_default()
+
+    lines: List[str] = []
+    lines.append("FUNSD GT Corrections - Prompt Card")
+    lines.append("")
+    lines.append(f"Document: {doc_id}")
+    lines.append("")
+    lines.append("Task: Find the correct VALUE for each field label below.")
+    lines.append("Draw one box around the value text (not the label).")
+    lines.append("")
+
+    for idx, case in enumerate(cases, start=1):
+        lines.append(f"Prompt {idx}")
+        lines.append(f"Field label: {case.get('field_label', '').strip()}")
+        if case.get("expected"):
+            lines.append(f"Expected (GT): {case.get('expected')}")
+        if case.get("raw"):
+            lines.append(f"Raw answer: {case.get('raw')}")
+        if case.get("indexed"):
+            lines.append(f"Indexed answer: {case.get('indexed')}")
+        if case.get("example_id"):
+            lines.append(f"Example id: {case.get('example_id')}")
+        if case.get("run"):
+            lines.append(f"Run: {case.get('run')}")
+        lines.append("")
+
+    wrapped: List[str] = []
+    max_chars = 90
+    for line in lines:
+        if not line:
+            wrapped.append("")
+            continue
+        for sub in textwrap.wrap(line, width=max_chars):
+            wrapped.append(sub)
+
+    safe_lines = [_safe_ascii(line) for line in wrapped]
+
+    try:
+        bbox = font.getbbox("Ag")
+        line_height = (bbox[3] - bbox[1]) + 8
+    except Exception:
+        line_height = font_size + 8
+
+    height = margin * 2 + line_height * max(1, len(safe_lines))
+    height = max(height, 800)
+
+    img = Image.new("RGB", (width, height), "white")
+    draw = ImageDraw.Draw(img)
+    y = margin
+    for line in safe_lines:
+        draw.text((margin, y), line, fill="black", font=font)
+        y += line_height
+
+    out_path = out_dir / f"{doc_id}_prompt.png"
+    img.save(out_path)
+    return out_path
+
+
 def _run_cli(args: List[str]) -> str:
     result = subprocess.run(args, capture_output=True, text=True, check=True)
     out = (result.stdout or "").strip()
@@ -161,6 +234,11 @@ def main() -> None:
         "--labels",
         default="data/cvat/labels.json",
         help="Label spec JSON for CVAT project",
+    )
+    ap.add_argument(
+        "--prompt-cards-dir",
+        default="data/cvat/prompt_cards",
+        help="Directory for generated prompt card images",
     )
     ap.add_argument(
         "--reset",
@@ -222,6 +300,7 @@ def main() -> None:
     cases_by_doc = _parse_eval_review(Path(args.eval_review))
     images_dir = Path(args.images_dir)
     base_guide = Path("docs/cvat-guide.md").read_text(encoding="utf-8")
+    prompt_dir = Path(args.prompt_cards_dir)
 
     for doc_id, cases in cases_by_doc.items():
         img_path = _find_image_path(images_dir, doc_id)
@@ -229,6 +308,7 @@ def main() -> None:
             print(f"Skipping {doc_id}: image not found in {images_dir}")
             continue
         task_name = f"FUNSD GT fix - {doc_id}"
+        prompt_path = _render_prompt_image(doc_id, cases, prompt_dir)
         out = _run_cli(
             [
                 "cvat-cli",
@@ -242,6 +322,7 @@ def main() -> None:
                 "create",
                 task_name,
                 "local",
+                str(prompt_path),
                 str(img_path),
                 "--project_id",
                 str(project_id),

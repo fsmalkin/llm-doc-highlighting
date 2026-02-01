@@ -19,6 +19,7 @@ __pycache__/
 
 # Datasets
 /data/funsd/
+/data/cvat/prompt_cards/
 
 # Editor
 .vscode/

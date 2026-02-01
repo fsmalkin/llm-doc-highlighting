@@ -28,4 +28,5 @@ Quality rules
 Navigation tips
 - The image name contains the FUNSD doc id.
 - Use the Guide panel in CVAT while labeling for this checklist.
- - Each task guide includes a per-document prompt section for what to label.
+- Each task guide includes a per-document prompt section for what to label.
+- The first frame in each task is a prompt card image; use Next/Prev to move to the document page.

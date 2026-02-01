@@ -52,6 +52,7 @@ In-tool instructions:
 - Open the task/job and click the \"Guide\" panel in CVAT.
 - The guide mirrors `docs/cvat-guide.md` and contains the labeling checklist.
 - Each task has a per-document prompt section generated from `docs/eval-review-2.md`.
+- The first frame in each task is a prompt card image; move to the next frame to annotate.
 
 To (re)create per-document tasks with prompts:
 ```bash
