@@ -9,7 +9,7 @@ Goal: document GT errors, capture corrected values, and curate a small FUNSD dem
 
 Milestones
 - Add GT correction schema + docs
-- Set up local CVAT workflow and a tiny pilot (1 to 3 docs)
+- Run a tiny pilot (1 to 3 docs) in Eval Review using GT decisions
 - Store first correction JSONs in `data/gt_corrections/funsd/`
 - Document FUNSD GT issues and where corrections are cataloged
 - Curate a small FUNSD demo subset for open-ended QA + grounding

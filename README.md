@@ -2,13 +2,13 @@
 
 This repository is a documentation-first snapshot of a document processing pipeline that produces geometry-grounded highlights.
 
+Roadmap: see `docs/roadmap.md` for forward-looking plans and active milestones.
 Core ideas implemented here:
 - Preprocessing-first artifacts: parse/chunk once, cache, and reuse.
 - LLM-indexed reading view: build a full-document reading view with stable global token indices tied to geometry (`word_id`).
 - Span-based citations: the model cites using `start_token`/`end_token` over that reading view, and we deterministically map spans -> `word_ids` -> geometry.
 - Deterministic fallback: when LLM is unavailable or returns invalid spans, fall back to simple deterministic matching.
 
-> **Prominent next step:** move into iterative evaluation. Start with small samples on each dataset to validate end-to-end data collection and reporting before scaling runs. See `docs/next-steps.md`.
 
 ## Quickstart (local)
 
@@ -65,7 +65,7 @@ Run:
 python scripts\demo_server.py
 ```
 
-Then open the URL printed at startup (default `http://127.0.0.1:8004/`). If the page does not load, set `DEMO_PORT`.
+Then open the URL printed at startup (default `http://127.0.0.1:8004/`). The landing page links to the demo; you can also go directly to `/demo.html`. If the page does not load, set `DEMO_PORT`.
 
 Fixed document (baked OCR PDF):
 ```
@@ -109,7 +109,7 @@ Notes:
 - The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
 - FUNSD prompts treat the field label as the key and ask for the corresponding value span.
 - Because GT has issues, treat FUNSD metrics as directional only. Use the corrections catalog when reviewing errors.
-- The demo app includes a Stats page at `/stats.html`, an Eval Review page at `/eval.html`, and a GT Corrections page at `/gt-review.html`.
+- The demo app includes a Stats page at `/stats.html` and an Eval Review page at `/eval.html` (GT corrections happen inside Eval Review).
 
 ## Docs
 
@@ -117,8 +117,7 @@ Notes:
 - `docs/pipeline.md` - Phase 1 and Phase 2, inputs/outputs, artifacts
 - `docs/data-model.md` - canonical JSON schema and invariants
 - `docs/runbook.md` - end-to-end runs and expected artifacts
-- `docs/gt-corrections.md` - GT correction workflow (in-repo UI, CVAT optional)
-- `docs/gt-review-guide.md` - GT corrections UI guide with screenshots
+- `docs/gt-corrections.md` - GT correction workflow (in-repo Eval Review)
 - `docs/gt-corrections-schema.md` - correction JSON schema
 - `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach
