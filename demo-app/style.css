@@ -28,6 +28,24 @@ body {
   grid-template-columns: 360px 1fr;
 }
 
+.landing-wrap {
+  grid-template-columns: 1fr;
+}
+
+.landing-main {
+  padding: 24px;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.landing-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-top: 20px;
+}
+
 .panel {
   background: var(--panel);
   border-right: 1px solid var(--border);

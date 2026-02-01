@@ -1,7 +1,7 @@
 # Ground truth corrections
 
 This repo tracks known GT errors and corrected values so evaluation results are explainable and auditable.
-We use a lightweight in-repo UI to annotate bounding boxes and store corrections in a small, dataset-agnostic JSON format.
+Corrections are captured inside the Eval Review UI and stored in a small, dataset-agnostic JSON format.
 
 ## Goals
 - Examine eval-reported errors against GT
@@ -22,21 +22,24 @@ We use a lightweight in-repo UI to annotate bounding boxes and store corrections
 
 ## Iterative workflow (small batches)
 
-1) Pick a tiny batch (1 to 3 docs) and open the GT Corrections page.
-2) Annotate only the corrections you need (not full relabels).
-3) Save corrections directly into `data/gt_corrections/`.
-4) Commit the corrections.
-5) Repeat with the next small batch.
+1) Pick a tiny batch (1 to 3 docs) and open the Eval Review UI.
+2) Select a run, document, and data point.
+3) Use the GT decisions panel:
+   - Accept A (raw+fuzzy) or B (indexed) to store corrected GT.
+   - Mark both wrong to exclude the sample from scoring.
+4) Corrections save into `data/gt_corrections/` automatically.
+5) Re-run the eval to refresh metrics (excluded counts show in Stats).
+6) Commit the corrections and repeat with the next batch.
 
-## GT Corrections UI (recommended)
+## Eval Review (recommended)
 
 Open the local demo server and navigate to:
-`/gt-review.html`
+`/eval.html`
 
 The UI:
-- Pulls prompts from `docs/eval-review-2.md`
-- Shows the document image
-- Lets you draw a bbox and fill value/notes
+- Shows dataset GT vs A/B method boxes
+- Lets you accept A or B as corrected GT
+- Lets you exclude samples where both are wrong
 - Saves JSON into `data/gt_corrections/<dataset>/<doc_id>.json`
 
 ## CVAT (legacy, optional)

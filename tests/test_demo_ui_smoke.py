@@ -1,6 +1,7 @@
 import json
 import os
 import pathlib
+import sys
 import threading
 import time
 
@@ -14,6 +15,8 @@ except Exception:
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def _start_server(host: str, port: int):
@@ -81,7 +84,7 @@ def test_demo_ui_ask_no_tdz_error():
                 ),
             )
 
-            page.goto(f"http://{host}:{port}/", wait_until="networkidle")
+            page.goto(f"http://{host}:{port}/demo.html", wait_until="networkidle")
             page.click("#btnAsk")
 
             page.wait_for_function(

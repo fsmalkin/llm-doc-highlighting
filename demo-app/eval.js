@@ -9,11 +9,30 @@ const exampleSelectEl = document.getElementById("exampleSelect");
 const docListEl = document.getElementById("docList");
 const prevSampleEl = document.getElementById("prevSample");
 const nextSampleEl = document.getElementById("nextSample");
+const docReviewStatusEl = document.getElementById("docReviewStatus");
+const docReviewCountsEl = document.getElementById("docReviewCounts");
+const browseSearchEl = document.getElementById("browseSearch");
+const toggleSearchEl = document.getElementById("toggleSearch");
 
 const evalFieldLabelEl = document.getElementById("evalFieldLabel");
+const fieldReviewStatusEl = document.getElementById("fieldReviewStatus");
 const evalExpectedValueEl = document.getElementById("evalExpectedValue");
+const gtStatusChipEl = document.getElementById("gtStatusChip");
 const evalAnswerRawEl = document.getElementById("evalAnswerRaw");
 const evalAnswerIndexedEl = document.getElementById("evalAnswerIndexed");
+const gtPickInputs = Array.from(document.querySelectorAll('input[name="gtPick"]'));
+
+const gtStatusBadgeEl = document.getElementById("gtStatusBadge");
+const gtStatusNoteEl = document.getElementById("gtStatusNote");
+const gtDecisionInputs = Array.from(document.querySelectorAll('input[name="gtDecision"]'));
+const gtExcludeEl = document.getElementById("gtExclude");
+const gtApplyBtn = document.getElementById("gtApplyBtn");
+const gtExcludedCountEl = document.getElementById("gtExcludedCount");
+const gtNoteEl = document.getElementById("gtNote");
+const gtNoteWrapEl = document.getElementById("gtNoteWrap");
+const gtNoteToggleEl = document.getElementById("toggleGtNote");
+const gtEmptyStateEl = document.getElementById("gtEmptyState");
+const gtMarkReviewedBtn = document.getElementById("gtMarkReviewedBtn");
 
 const metricRawIouEl = document.getElementById("metricRawIou");
 const metricRawPrecisionEl = document.getElementById("metricRawPrecision");
@@ -24,6 +43,8 @@ const metricIndexedIouEl = document.getElementById("metricIndexedIou");
 const metricIndexedPrecisionEl = document.getElementById("metricIndexedPrecision");
 const metricIndexedRecallEl = document.getElementById("metricIndexedRecall");
 const metricIndexedPass2El = document.getElementById("metricIndexedPass2");
+const abStatusChipEl = document.getElementById("abStatusChip");
+const abStatusNoteEl = document.getElementById("abStatusNote");
 
 const showMergedEl = document.getElementById("showMerged");
 const showGtEl = document.getElementById("showGt");
@@ -46,15 +67,66 @@ let pendingOverlay = null;
 let currentRunName = "";
 let pendingSelection = null;
 let pendingFocusTag = null;
+let currentExample = null;
+let correctionsCache = new Map();
+let currentSavedNote = "";
+let currentGtResolved = null;
+let gtSaveInFlight = false;
+let reviewStatsByDoc = new Map();
+let reviewStatsLoading = false;
+let currentHasCorrection = false;
+let noteOpen = false;
+let pendingDecision = "";
 
 function setText(el, text) {
   if (!el) return;
   el.textContent = text ? String(text) : "-";
 }
 
+function updateSearchToggleLabel() {
+  if (!browseSearchEl || !toggleSearchEl) return;
+  const collapsed = browseSearchEl.classList.contains("collapsed");
+  toggleSearchEl.textContent = collapsed ? "Search" : "Hide search";
+}
+
 function setBadge(el, value) {
   if (!el) return;
   el.textContent = value == null || value === "" ? "-" : String(value);
+}
+
+function setBadgeVariant(el, variant) {
+  if (!el) return;
+  el.classList.remove("good", "bad", "warn");
+  if (variant) el.classList.add(variant);
+}
+
+function normalizeLabel(text) {
+  return String(text || "")
+    .trim()
+    .replace(/\\s+/g, " ")
+    .replace(/:+$/, "")
+    .toLowerCase();
+}
+
+function cleanWordBoxes(boxes) {
+  const out = [];
+  for (const box of boxes || []) {
+    if (!Array.isArray(box) || box.length !== 4) continue;
+    const nums = box.map((v) => Number(v));
+    if (nums.some((v) => Number.isNaN(v))) continue;
+    out.push(nums);
+  }
+  return out;
+}
+
+function unionBoxes(boxes) {
+  const clean = cleanWordBoxes(boxes);
+  if (!clean.length) return null;
+  const xs0 = clean.map((b) => b[0]);
+  const ys0 = clean.map((b) => b[1]);
+  const xs1 = clean.map((b) => b[2]);
+  const ys1 = clean.map((b) => b[3]);
+  return [Math.min(...xs0), Math.min(...ys0), Math.max(...xs1), Math.max(...ys1)];
 }
 
 async function getJson(url) {
@@ -67,7 +139,54 @@ async function getJson(url) {
   return data;
 }
 
+async function postJson(url, payload) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    signal: controller.signal,
+  });
+  clearTimeout(timer);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.ok === false) {
+    const msg = data.error || `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+async function loadCorrectionsForDoc(docId) {
+  if (!docId) return { items: [], byExample: new Map(), byLabel: new Map() };
+  if (correctionsCache.has(docId)) return correctionsCache.get(docId);
+  let payload = { doc_id: docId, items: [] };
+  try {
+    const data = await getJson(`/api/gt/corrections?doc=${encodeURIComponent(docId)}`);
+    payload = data?.payload || payload;
+  } catch {
+    payload = { doc_id: docId, items: [] };
+  }
+  const items = Array.isArray(payload.items) ? payload.items : [];
+  const byExample = new Map();
+  const byLabel = new Map();
+  for (const item of items) {
+    if (!item || typeof item !== "object") continue;
+    const exId = item?.links?.eval_example_id || item?.item_id;
+    if (exId) {
+      byExample.set(String(exId), item);
+      continue;
+    }
+    const labelKey = normalizeLabel(item?.field_label || "");
+    if (labelKey) byLabel.set(labelKey, item);
+  }
+  const entry = { items, byExample, byLabel };
+  correctionsCache.set(docId, entry);
+  return entry;
+}
+
 function toFixed(value) {
+  if (value == null || value === "") return "-";
   const num = Number(value);
   if (!Number.isFinite(num)) return "-";
   return num.toFixed(2);
@@ -77,12 +196,412 @@ function updateMetrics(rawMetrics, indexedMetrics) {
   setBadge(metricRawIouEl, toFixed(rawMetrics?.word_iou));
   setBadge(metricRawPrecisionEl, toFixed(rawMetrics?.precision));
   setBadge(metricRawRecallEl, toFixed(rawMetrics?.recall));
-  setBadge(metricRawPass2El, rawMetrics?.used_pass2 ? "yes" : "no");
+  if (rawMetrics?.used_pass2 == null || rawMetrics?.excluded) {
+    setBadge(metricRawPass2El, "-");
+  } else {
+    setBadge(metricRawPass2El, rawMetrics?.used_pass2 ? "yes" : "no");
+  }
 
   setBadge(metricIndexedIouEl, toFixed(indexedMetrics?.word_iou));
   setBadge(metricIndexedPrecisionEl, toFixed(indexedMetrics?.precision));
   setBadge(metricIndexedRecallEl, toFixed(indexedMetrics?.recall));
-  setBadge(metricIndexedPass2El, indexedMetrics?.used_pass2 ? "yes" : "no");
+  if (indexedMetrics?.used_pass2 == null || indexedMetrics?.excluded) {
+    setBadge(metricIndexedPass2El, "-");
+  } else {
+    setBadge(metricIndexedPass2El, indexedMetrics?.used_pass2 ? "yes" : "no");
+  }
+
+  const alignThreshold = 0.85;
+  const rawAligned = Number(rawMetrics?.word_iou || 0) >= alignThreshold && !rawMetrics?.excluded;
+  const idxAligned = Number(indexedMetrics?.word_iou || 0) >= alignThreshold && !indexedMetrics?.excluded;
+  let status = "Needs review";
+  let variant = "warn";
+  if (rawAligned && idxAligned) {
+    status = "Aligned";
+    variant = "good";
+  } else if (rawAligned || idxAligned) {
+    status = "Partial";
+    variant = "warn";
+  }
+  if (abStatusChipEl) {
+    abStatusChipEl.textContent = status;
+    setBadgeVariant(abStatusChipEl, variant);
+  }
+  if (abStatusNoteEl) {
+    if (status === "Aligned") {
+      abStatusNoteEl.textContent = "GT matches both methods at IoU >= 0.85.";
+    } else if (status === "Partial") {
+      abStatusNoteEl.textContent = "Only one method aligns with GT at IoU >= 0.85.";
+    } else {
+      abStatusNoteEl.textContent = "Neither method aligns at IoU >= 0.85.";
+    }
+  }
+}
+
+function resolveGtForExample(ex, correctionEntry) {
+  const datasetBoxes = dedupeBoxes((ex.expected_words || []).map((w) => w.box).filter(Boolean));
+  const datasetValue = ex.expected_answer || "";
+  if (!correctionEntry) {
+    return {
+      status: "use_dataset",
+      source: "dataset",
+      decision: "dataset",
+      value: datasetValue,
+      boxes: datasetBoxes,
+      note: "Using dataset ground truth.",
+    };
+  }
+  let status = String(correctionEntry.gt_status || "").toLowerCase();
+  if (!status) {
+    status = correctionEntry.value || correctionEntry.bbox || correctionEntry.word_boxes ? "use_correction" : "use_dataset";
+  }
+  if (status === "exclude") {
+    return {
+      status: "exclude",
+      source: "excluded",
+      decision: "exclude",
+      value: "Excluded from scoring",
+      boxes: [],
+      note: "Excluded from scoring (both wrong).",
+    };
+  }
+  if (status === "use_dataset") {
+    return {
+      status: "use_dataset",
+      source: "dataset",
+      decision: "dataset",
+      value: datasetValue,
+      boxes: datasetBoxes,
+      note: "Using dataset ground truth.",
+    };
+  }
+  const wordBoxes = cleanWordBoxes(correctionEntry.word_boxes || correctionEntry.boxes || []);
+  const singleBox = cleanWordBoxes(correctionEntry.bbox ? [correctionEntry.bbox] : []);
+  const boxes = wordBoxes.length ? wordBoxes : singleBox;
+  const value = String(correctionEntry.value || datasetValue || "").trim();
+  const method = correctionEntry?.source?.method || correctionEntry?.links?.method || "correction";
+  if (!boxes.length) {
+    return {
+      status: "use_dataset",
+      source: "dataset",
+      decision: "dataset",
+      value: datasetValue,
+      boxes: datasetBoxes,
+      note: "Correction missing boxes; falling back to dataset GT.",
+    };
+  }
+  return {
+    status: "use_correction",
+    source: method,
+    decision: method === "raw" ? "raw" : method === "indexed" ? "indexed" : "custom",
+    value: value || datasetValue,
+    boxes,
+    note: `Using corrected GT from ${method}.`,
+  };
+}
+
+function updateGtStatusUI(gt) {
+  if (!gtStatusBadgeEl || !gtStatusNoteEl || !gtStatusChipEl) return;
+  let badgeText = "Dataset";
+  let chipText = "Dataset";
+  let variant = null;
+  if (gt && gt.reviewed === false) {
+    badgeText = "Not reviewed";
+    chipText = "Pending";
+    variant = "warn";
+  }
+  if (gt?.status === "use_correction") {
+    badgeText = "Corrected";
+    chipText = "Corrected";
+    variant = "good";
+  } else if (gt?.status === "exclude") {
+    badgeText = "Excluded";
+    chipText = "Excluded";
+    variant = "bad";
+  }
+  gtStatusBadgeEl.textContent = badgeText;
+  gtStatusChipEl.textContent = chipText;
+  setBadgeVariant(gtStatusBadgeEl, variant);
+  setBadgeVariant(gtStatusChipEl, variant);
+  gtStatusNoteEl.textContent = gt?.note || "Select a data point to review GT.";
+  if (gt && gt.reviewed === false) {
+    gtStatusNoteEl.textContent = "No decision saved yet.";
+  }
+  for (const input of gtDecisionInputs) {
+    input.checked = Boolean(gt?.decision && input.value === gt.decision);
+  }
+  for (const input of gtPickInputs) {
+    if (pendingDecision) {
+      input.checked = input.value === pendingDecision;
+    } else if (currentHasCorrection) {
+      input.checked = Boolean(gt?.decision && input.value === gt.decision);
+    } else {
+      input.checked = false;
+    }
+  }
+  if (gtExcludeEl) {
+    if (pendingDecision) {
+      gtExcludeEl.checked = pendingDecision === "exclude";
+    } else if (currentHasCorrection) {
+      gtExcludeEl.checked = gt?.decision === "exclude";
+    } else {
+      gtExcludeEl.checked = false;
+    }
+  }
+  if (gt?.decision === "custom") {
+    gtStatusNoteEl.textContent = "Using a custom correction. Selecting a decision will overwrite it.";
+  }
+  if (gtEmptyStateEl) {
+    gtEmptyStateEl.style.display = gt?.reviewed === false ? "grid" : "none";
+  }
+}
+
+function setNoteOpenState(open) {
+  noteOpen = open;
+  if (gtNoteWrapEl) {
+    gtNoteWrapEl.classList.toggle("collapsed", !open);
+  }
+  if (gtNoteToggleEl) {
+    gtNoteToggleEl.textContent = open ? "Hide note" : "Add note";
+  }
+}
+
+function getCorrectionEntryForExample(ex) {
+  if (!ex) return null;
+  const cached = correctionsCache.get(ex.doc_id);
+  if (!cached) return null;
+  const byId = cached.byExample?.get?.(ex.id);
+  if (byId) return byId;
+  const labelKey = normalizeLabel(ex.question || "");
+  return cached.byLabel?.get?.(labelKey) || null;
+}
+
+function formatDocLabel(docId, totalCount, reviewedCount) {
+  const total = Number(totalCount || 0);
+  const reviewed = Number(reviewedCount || 0);
+  if (!total) return `${docId}`;
+  if (reviewed >= total) return `${docId} (${total}) [reviewed]`;
+  if (reviewed > 0) return `${docId} (${total}) [${reviewed}/${total} reviewed]`;
+  return `${docId} (${total}) [not reviewed]`;
+}
+
+async function computeReviewStatsForDoc(docId) {
+  const entry = docIndex.find((d) => d.docId === docId);
+  if (!entry) return { reviewedCount: 0, totalCount: 0 };
+  await loadCorrectionsForDoc(docId);
+  let reviewedCount = 0;
+  for (const ex of entry.examples) {
+    const reviewed = Boolean(getCorrectionEntryForExample(ex));
+    ex.reviewed = reviewed;
+    if (reviewed) reviewedCount += 1;
+  }
+  const totalCount = entry.examples.length;
+  reviewStatsByDoc.set(docId, { reviewedCount, totalCount });
+  return { reviewedCount, totalCount };
+}
+
+function updateDocSelectLabels() {
+  if (!docSelectEl) return;
+  const options = Array.from(docSelectEl.options || []);
+  for (const opt of options) {
+    const docId = opt.value;
+    const entry = docIndex.find((d) => d.docId === docId);
+    if (!entry) continue;
+    const stats = reviewStatsByDoc.get(docId) || { reviewedCount: 0, totalCount: entry.examples.length };
+    opt.textContent = formatDocLabel(docId, entry.examples.length, stats.reviewedCount);
+  }
+}
+
+function updateExampleSelectLabels(entry) {
+  if (!entry || !exampleSelectEl) return;
+  const options = Array.from(exampleSelectEl.options || []);
+  for (const opt of options) {
+    const ex = entry.examples.find((e) => e.id === opt.value);
+    if (!ex) continue;
+    opt.textContent = `${ex.question}${ex.reviewed ? " (reviewed)" : ""}`;
+  }
+}
+
+function updateDocReviewStatus(docId) {
+  const entry = docIndex.find((d) => d.docId === docId);
+  if (!entry) return;
+  const stats = reviewStatsByDoc.get(docId) || { reviewedCount: 0, totalCount: entry.examples.length };
+  const reviewedCount = stats.reviewedCount;
+  const totalCount = stats.totalCount;
+  let status = "Not reviewed";
+  if (totalCount && reviewedCount >= totalCount) {
+    status = "Fully reviewed";
+  } else if (reviewedCount > 0) {
+    status = "Partially reviewed";
+  }
+  if (docReviewStatusEl) docReviewStatusEl.textContent = status;
+  if (docReviewCountsEl) docReviewCountsEl.textContent = `${reviewedCount}/${totalCount} fields reviewed`;
+}
+
+function updateFieldReviewStatus(ex) {
+  if (!fieldReviewStatusEl) return;
+  if (!ex) {
+    fieldReviewStatusEl.textContent = "-";
+    return;
+  }
+  fieldReviewStatusEl.textContent = ex.reviewed ? "Reviewed" : "Not reviewed";
+}
+
+async function hydrateReviewStats() {
+  if (reviewStatsLoading) return;
+  reviewStatsLoading = true;
+  try {
+    for (const entry of docIndex) {
+      await computeReviewStatsForDoc(entry.docId);
+      updateDocSelectLabels();
+    }
+  } finally {
+    reviewStatsLoading = false;
+  }
+}
+
+function setGtSaving(isSaving) {
+  gtSaveInFlight = isSaving;
+  if (!gtApplyBtn) return;
+  if (isSaving) {
+    gtApplyBtn.dataset.label = gtApplyBtn.textContent || "Apply decision";
+    gtApplyBtn.textContent = "Saving...";
+    gtApplyBtn.disabled = true;
+  } else {
+    gtApplyBtn.textContent = gtApplyBtn.dataset.label || "Apply decision";
+    delete gtApplyBtn.dataset.label;
+  }
+}
+
+function updateGtDecisionButtons(rawData, indexedData, gtResolved) {
+  const hasExample = Boolean(currentExample);
+  const rawBoxes = collectBoxes(rawData);
+  const indexedBoxes = collectBoxes(indexedData);
+  const rawBBox = rawData?.mapped?.pages?.[0]?.bbox_abs;
+  const indexedBBox = indexedData?.mapped?.pages?.[0]?.bbox_abs;
+  const rawOk = Boolean(rawData?.answer) && (rawBoxes.length > 0 || Array.isArray(rawBBox));
+  const indexedOk = Boolean(indexedData?.answer) && (indexedBoxes.length > 0 || Array.isArray(indexedBBox));
+  for (const input of gtDecisionInputs) {
+    if (input.value === "raw") {
+      input.disabled = !hasExample || !rawOk;
+    } else if (input.value === "indexed") {
+      input.disabled = !hasExample || !indexedOk;
+    } else {
+      input.disabled = !hasExample;
+    }
+  }
+  for (const input of gtPickInputs) {
+    if (input.value === "raw") {
+      input.disabled = !hasExample || !rawOk;
+    } else if (input.value === "indexed") {
+      input.disabled = !hasExample || !indexedOk;
+    } else {
+      input.disabled = !hasExample;
+    }
+  }
+  const selectedFromPick = gtPickInputs.find((input) => input.checked)?.value || "";
+  const selectedFromExclude = gtExcludeEl?.checked ? "exclude" : "";
+  const selected = selectedFromExclude || selectedFromPick || "";
+  const currentDecision = gtResolved?.decision || "";
+  const noteValue = String(gtNoteEl?.value || "").trim();
+  const noteChanged = noteValue !== String(currentSavedNote || "").trim();
+  if (gtApplyBtn) {
+    const hasSelection = Boolean(selected);
+    gtApplyBtn.disabled =
+      gtSaveInFlight ||
+      !hasExample ||
+      (!hasSelection && !noteChanged) ||
+      (hasSelection && selected === currentDecision && !noteChanged);
+  }
+  if (gtMarkReviewedBtn) {
+    gtMarkReviewedBtn.disabled = gtSaveInFlight || !hasExample;
+  }
+}
+
+function buildEvalUrlParams(ex) {
+  if (!ex) return "";
+  const params = new URLSearchParams();
+  if (currentRunName) params.set("run", currentRunName);
+  if (ex.doc_id) params.set("doc", ex.doc_id);
+  if (ex.id) params.set("ex", ex.id);
+  return params.toString();
+}
+
+function buildCorrectionItem(ex, method, methodData, gtStatus, note) {
+  const wordBoxes = dedupeBoxes(collectBoxes(methodData));
+  const fallbackBox = methodData?.mapped?.pages?.[0]?.bbox_abs;
+  const bbox =
+    unionBoxes(wordBoxes) ||
+    (Array.isArray(fallbackBox) && fallbackBox.length === 4 ? fallbackBox : null);
+  const value = String(methodData?.answer || "").trim();
+  return {
+    item_id: ex.id,
+    field_label: ex.question,
+    value,
+    value_type: methodData?.value_type || null,
+    bbox: bbox || null,
+    word_boxes: wordBoxes,
+    gt_status: gtStatus,
+    notes: note || null,
+    links: {
+      eval_example_id: ex.id,
+      eval_run: currentRunName || null,
+      eval_url_params: buildEvalUrlParams(ex),
+      method,
+    },
+    source: {
+      tool: "eval-viewer",
+      method,
+      saved_at: new Date().toISOString(),
+    },
+  };
+}
+
+function buildStatusItem(ex, gtStatus, note) {
+  return {
+    item_id: ex.id,
+    field_label: ex.question,
+    gt_status: gtStatus,
+    notes: note || null,
+    links: {
+      eval_example_id: ex.id,
+      eval_run: currentRunName || null,
+      eval_url_params: buildEvalUrlParams(ex),
+    },
+    source: {
+      tool: "eval-viewer",
+      saved_at: new Date().toISOString(),
+    },
+  };
+}
+
+async function saveCorrection(docId, item) {
+  if (!docId) return;
+  const cache = await loadCorrectionsForDoc(docId);
+  const items = Array.isArray(cache.items) ? cache.items.slice() : [];
+  const exId = item?.links?.eval_example_id || item?.item_id;
+  let replaced = false;
+  for (let i = 0; i < items.length; i += 1) {
+    const existing = items[i];
+    const existingId = existing?.links?.eval_example_id || existing?.item_id;
+    if (exId && existingId && String(existingId) === String(exId)) {
+      items[i] = item;
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) items.push(item);
+  const payload = { doc_id: docId, items };
+  await postJson("/api/gt/corrections", payload);
+  correctionsCache.delete(docId);
+  await loadCorrectionsForDoc(docId);
+}
+
+async function refreshCurrentExample(focusTag = null) {
+  const ex = currentExample || findExampleById(String(exampleSelectEl?.value || ""));
+  if (!ex) return;
+  await loadCorrectionsForDoc(ex.doc_id);
+  renderExample(ex, { focus: false, focusTag });
 }
 
 function clearOverlay() {
@@ -147,7 +666,7 @@ function renderOverlay(gtBoxes, rawBoxes, indexedBoxes, pageNo) {
 
   const showGt = showGtEl ? showGtEl.checked : true;
   const showRaw = showRawEl ? showRawEl.checked : true;
-  const showIndexed = showIndexedEl ? showIndexedEl.checked : true;
+  const showIndexed = showIndexedEl ? showIndexedEl.checked : false;
   const abState = showRaw && showIndexed ? "on" : !showRaw && !showIndexed ? "off" : "partial";
 
   const created = [];
@@ -289,13 +808,12 @@ function dedupeWords(words) {
 function sanitizeExample(ex) {
   if (!ex) return ex;
   const expectedWords = dedupeWords(ex.expected_words || []);
-  const expectedAnswer =
-    expectedWords.length > 0 ? expectedWords.map((w) => w.text).join(" ").trim() : ex.expected_answer;
+  const canonicalAnswer = String(ex.expected_answer || "").trim();
   const methods = ex.methods || {};
   return {
     ...ex,
     expected_words: expectedWords,
-    expected_answer: expectedAnswer || ex.expected_answer,
+    expected_answer: canonicalAnswer,
     methods,
   };
 }
@@ -540,16 +1058,17 @@ function applyDocFilter() {
       btn.textContent = `${item.docId} (${item.examples.length})`;
       btn.addEventListener("click", () => {
         docSelectEl.value = item.docId;
-        loadExamplesForDoc(item.docId);
+        void loadExamplesForDoc(item.docId);
       });
       docListEl.appendChild(btn);
     }
   }
   docSelectEl.value = items[0].docId;
-  loadExamplesForDoc(items[0].docId);
+  void loadExamplesForDoc(items[0].docId);
 }
 
-function loadExamplesForDoc(docId, selectedExampleId = null) {
+async function loadExamplesForDoc(docId, selectedExampleId = null) {
+  await computeReviewStatsForDoc(docId);
   const entry = docIndex.find((d) => d.docId === docId);
   exampleSelectEl.innerHTML = "";
   if (docListEl) {
@@ -563,12 +1082,20 @@ function loadExamplesForDoc(docId, selectedExampleId = null) {
     opt.value = "";
     opt.textContent = "Select a document";
     exampleSelectEl.appendChild(opt);
+    currentExample = null;
+    currentGtResolved = null;
+    currentHasCorrection = false;
+    updateGtStatusUI(null);
+    updateGtDecisionButtons({}, {}, null);
+    currentSavedNote = "";
+    if (gtNoteEl) gtNoteEl.value = "";
+    updateFieldReviewStatus(null);
     return;
   }
   for (const ex of entry.examples) {
     const opt = document.createElement("option");
     opt.value = ex.id;
-    opt.textContent = ex.question;
+    opt.textContent = `${ex.question}${ex.reviewed ? " (reviewed)" : ""}`;
     exampleSelectEl.appendChild(opt);
   }
   const target =
@@ -577,6 +1104,9 @@ function loadExamplesForDoc(docId, selectedExampleId = null) {
       : entry.examples[0];
   exampleSelectEl.value = target?.id || "";
   renderExample(target, { focus: true });
+  updateExampleSelectLabels(entry);
+  updateDocSelectLabels();
+  updateDocReviewStatus(docId);
   updateSelectionInUrl();
 }
 
@@ -619,7 +1149,7 @@ function stepSample(direction) {
   const targetExample = targetEntry?.examples?.[nextExPos];
   if (!targetExample) return;
   docSelectEl.value = targetDocId;
-  loadExamplesForDoc(targetDocId, targetExample.id);
+  void loadExamplesForDoc(targetDocId, targetExample.id);
 }
 
 function findExampleById(id) {
@@ -632,18 +1162,44 @@ function findExampleById(id) {
 
 function renderExample(ex, opts = { focus: true, focusTag: null }) {
   if (!ex) return;
+  const isNewExample = !currentExample || currentExample.id !== ex.id;
+  currentExample = ex;
+  if (isNewExample) pendingDecision = "";
   syncABMaster();
   setText(evalFieldLabelEl, ex.question);
-  setText(evalExpectedValueEl, ex.expected_answer);
-
   const rawData = ex.methods?.raw || {};
   const indexedData = ex.methods?.indexed || {};
+
+  const correctionEntry = getCorrectionEntryForExample(ex);
+  currentHasCorrection = Boolean(correctionEntry);
+  const gtResolved = resolveGtForExample(ex, correctionEntry);
+  currentGtResolved = gtResolved;
+  gtResolved.reviewed = currentHasCorrection;
+  if (!currentHasCorrection) {
+    gtResolved.decision = "";
+    gtResolved.note = "No decision saved yet. Choose a decision or mark reviewed.";
+  }
+  updateGtStatusUI(gtResolved);
+  setText(evalExpectedValueEl, gtResolved.value);
+  if (evalExpectedValueEl) {
+    evalExpectedValueEl.disabled = gtResolved.status === "exclude";
+  }
+  if (showGtEl) {
+    showGtEl.disabled = gtResolved.status === "exclude";
+  }
+  currentSavedNote = String(correctionEntry?.notes || "");
+  if (gtNoteEl) {
+    gtNoteEl.value = currentSavedNote;
+  }
+  setNoteOpenState(Boolean(currentSavedNote));
+  updateFieldReviewStatus(ex);
 
   setText(evalAnswerRawEl, rawData?.answer || rawData?.error || "-");
   setText(evalAnswerIndexedEl, indexedData?.answer || indexedData?.error || "-");
   updateMetrics(rawData?.metrics || {}, indexedData?.metrics || {});
+  updateGtDecisionButtons(rawData, indexedData, gtResolved);
 
-  const gtBoxes = dedupeBoxes((ex.expected_words || []).map((w) => w.box).filter(Boolean));
+  const gtBoxes = dedupeBoxes(gtResolved.boxes || []);
   const rawBoxes = dedupeBoxes(collectBoxes(rawData));
   const indexedBoxes = dedupeBoxes(collectBoxes(indexedData));
   const useMerged = showMergedEl ? showMergedEl.checked : false;
@@ -755,6 +1311,26 @@ function updateSelectionInUrl() {
 function setRunEmptyState() {
   setText(evalRunNameEl, "No run selected");
   setText(evalRunMetaEl, "Choose a run to begin.");
+  if (gtExcludedCountEl) {
+    gtExcludedCountEl.textContent = "Excluded in this run: -";
+  }
+  if (abStatusChipEl) {
+    abStatusChipEl.textContent = "-";
+    setBadgeVariant(abStatusChipEl, null);
+  }
+  if (abStatusNoteEl) {
+    abStatusNoteEl.textContent = "Select a data point to see alignment.";
+  }
+  currentExample = null;
+  currentGtResolved = null;
+  currentHasCorrection = false;
+  updateGtStatusUI(null);
+  updateGtDecisionButtons({}, {}, null);
+  currentSavedNote = "";
+  if (gtNoteEl) gtNoteEl.value = "";
+  if (docReviewStatusEl) docReviewStatusEl.textContent = "-";
+  if (docReviewCountsEl) docReviewCountsEl.textContent = "-";
+  updateFieldReviewStatus(null);
   docSelectEl.innerHTML = "";
   exampleSelectEl.innerHTML = "";
   if (docListEl) {
@@ -804,9 +1380,17 @@ async function loadRun(name) {
     .join(" | ");
   setText(evalRunNameEl, name);
   setText(evalRunMetaEl, metaText || "-");
+  const excludedCount =
+    meta.excluded_count == null
+      ? Number(meta.excluded ?? 0)
+      : Number(meta.excluded_count ?? 0);
+  if (gtExcludedCountEl) {
+    gtExcludedCountEl.textContent = `Excluded in this run: ${Number.isFinite(excludedCount) ? excludedCount : "-"}`;
+  }
 
   buildDocIndex(sanitizedExamples);
   applyDocFilter();
+  void hydrateReviewStats();
   if (pendingSelection && (!pendingSelection.run || pendingSelection.run === name)) {
     const docId = pendingSelection.doc;
     const exId = pendingSelection.example;
@@ -815,13 +1399,13 @@ async function loadRun(name) {
       const ex = findExampleById(exId);
       if (ex) {
         docSelectEl.value = ex.doc_id;
-        loadExamplesForDoc(ex.doc_id, ex.id);
+        await loadExamplesForDoc(ex.doc_id, ex.id);
         handled = true;
       }
     }
     if (!handled && docId) {
       docSelectEl.value = docId;
-      loadExamplesForDoc(docId, exId || null);
+      await loadExamplesForDoc(docId, exId || null);
     }
     pendingSelection = null;
   }
@@ -969,7 +1553,15 @@ async function initViewer() {
 }
 
 docSearchEl?.addEventListener("input", () => applyDocFilter());
-docSelectEl?.addEventListener("change", () => loadExamplesForDoc(String(docSelectEl.value || "")));
+toggleSearchEl?.addEventListener("click", () => {
+  if (!browseSearchEl) return;
+  const isCollapsed = browseSearchEl.classList.toggle("collapsed");
+  updateSearchToggleLabel();
+  if (!isCollapsed && docSearchEl) {
+    docSearchEl.focus();
+  }
+});
+docSelectEl?.addEventListener("change", () => void loadExamplesForDoc(String(docSelectEl.value || "")));
 exampleSelectEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: true });
@@ -999,6 +1591,138 @@ toggleABEl?.addEventListener("change", () => {
   const ex = findExampleById(String(exampleSelectEl.value || ""));
   if (ex) renderExample(ex, { focus: false });
 });
+for (const input of gtDecisionInputs) {
+  input.addEventListener("change", () => {
+    const ex = currentExample || findExampleById(String(exampleSelectEl.value || ""));
+    if (!ex) return;
+    const correctionEntry = getCorrectionEntryForExample(ex);
+    const gtResolved = resolveGtForExample(ex, correctionEntry);
+    currentGtResolved = gtResolved;
+    updateGtDecisionButtons(ex.methods?.raw || {}, ex.methods?.indexed || {}, gtResolved);
+  });
+}
+for (const pick of gtPickInputs) {
+  pick.addEventListener("change", () => {
+    const decision = pick.checked ? pick.value : "";
+    if (decision) {
+      pendingDecision = decision;
+      if (gtExcludeEl) gtExcludeEl.checked = false;
+    } else if (pendingDecision === pick.value) {
+      pendingDecision = "";
+    }
+    const ex = currentExample || findExampleById(String(exampleSelectEl.value || ""));
+    if (!ex) return;
+    const correctionEntry = getCorrectionEntryForExample(ex);
+    const gtResolved = resolveGtForExample(ex, correctionEntry);
+    currentGtResolved = gtResolved;
+    updateGtDecisionButtons(ex.methods?.raw || {}, ex.methods?.indexed || {}, gtResolved);
+  });
+}
+gtExcludeEl?.addEventListener("change", () => {
+  if (gtExcludeEl.checked) {
+    pendingDecision = "exclude";
+    for (const pick of gtPickInputs) {
+      pick.checked = false;
+    }
+  } else if (pendingDecision === "exclude") {
+    pendingDecision = "";
+  }
+  const ex = currentExample || findExampleById(String(exampleSelectEl.value || ""));
+  if (!ex) return;
+  const correctionEntry = getCorrectionEntryForExample(ex);
+  const gtResolved = resolveGtForExample(ex, correctionEntry);
+  currentGtResolved = gtResolved;
+  updateGtDecisionButtons(ex.methods?.raw || {}, ex.methods?.indexed || {}, gtResolved);
+});
+gtNoteEl?.addEventListener("input", () => {
+  if (!noteOpen) setNoteOpenState(true);
+  const ex = currentExample || findExampleById(String(exampleSelectEl.value || ""));
+  if (!ex) return;
+  const gtResolved = currentGtResolved || resolveGtForExample(ex, getCorrectionEntryForExample(ex));
+  updateGtDecisionButtons(ex.methods?.raw || {}, ex.methods?.indexed || {}, gtResolved);
+});
+gtNoteToggleEl?.addEventListener("click", () => {
+  setNoteOpenState(!noteOpen);
+  if (noteOpen && gtNoteEl) {
+    gtNoteEl.focus();
+  }
+});
+gtApplyBtn?.addEventListener("click", async () => {
+  if (!currentExample) return;
+  const selectedFromPick = gtPickInputs.find((input) => input.checked)?.value || "";
+  const selectedFromExclude = gtExcludeEl?.checked ? "exclude" : "";
+  const selected = selectedFromExclude || selectedFromPick || "";
+  const fallbackDecision = currentGtResolved?.decision || "";
+  const noteValue = String(gtNoteEl?.value || "").trim();
+  if (gtSaveInFlight) return;
+  const currentDecision = currentGtResolved?.decision || "";
+  const noteChanged = noteValue !== String(currentSavedNote || "").trim();
+  const decision = selected || (noteChanged ? fallbackDecision : "");
+  if (!decision) return;
+  const decisionChanged = decision !== currentDecision;
+  try {
+    setGtSaving(true);
+    if (decision === "custom" && !selected) {
+      const existing = getCorrectionEntryForExample(currentExample);
+      if (!existing) return;
+      const updated = { ...existing, notes: noteValue };
+      updated.source = {
+        ...(existing.source || {}),
+        tool: "eval-viewer",
+        saved_at: new Date().toISOString(),
+      };
+      await saveCorrection(currentExample.doc_id, updated);
+    } else if (decision === "dataset") {
+      const item = buildStatusItem(currentExample, "use_dataset", noteValue);
+      await saveCorrection(currentExample.doc_id, item);
+    } else if (decision === "exclude") {
+      const item = buildStatusItem(currentExample, "exclude", noteValue);
+      await saveCorrection(currentExample.doc_id, item);
+    } else if (decision === "raw") {
+      const rawData = currentExample.methods?.raw || {};
+      const item = buildCorrectionItem(currentExample, "raw", rawData, "use_correction", noteValue);
+      await saveCorrection(currentExample.doc_id, item);
+    } else if (decision === "indexed") {
+      const indexedData = currentExample.methods?.indexed || {};
+      const item = buildCorrectionItem(currentExample, "indexed", indexedData, "use_correction", noteValue);
+      await saveCorrection(currentExample.doc_id, item);
+    }
+    pendingDecision = "";
+    if (decisionChanged) {
+      await refreshCurrentExample("gt");
+    } else if (noteChanged) {
+      currentSavedNote = noteValue;
+      updateGtDecisionButtons(currentExample.methods?.raw || {}, currentExample.methods?.indexed || {}, currentGtResolved);
+      if (gtStatusNoteEl) gtStatusNoteEl.textContent = "Note saved.";
+    }
+    await computeReviewStatsForDoc(currentExample.doc_id);
+    updateDocSelectLabels();
+    updateDocReviewStatus(currentExample.doc_id);
+  } catch (err) {
+    if (gtStatusNoteEl) gtStatusNoteEl.textContent = String(err?.message || err || "Failed to save correction.");
+  } finally {
+    setGtSaving(false);
+  }
+});
+
+gtMarkReviewedBtn?.addEventListener("click", async () => {
+  if (!currentExample || gtSaveInFlight) return;
+  const noteValue = String(gtNoteEl?.value || "").trim();
+  try {
+    setGtSaving(true);
+    const item = buildStatusItem(currentExample, "use_dataset", noteValue);
+    await saveCorrection(currentExample.doc_id, item);
+    pendingDecision = "";
+    await refreshCurrentExample("gt");
+    await computeReviewStatsForDoc(currentExample.doc_id);
+    updateDocSelectLabels();
+    updateDocReviewStatus(currentExample.doc_id);
+  } catch (err) {
+    if (gtStatusNoteEl) gtStatusNoteEl.textContent = String(err?.message || err || "Failed to save correction.");
+  } finally {
+    setGtSaving(false);
+  }
+});
 evalRunSelectEl?.addEventListener("change", () => {
   const name = String(evalRunSelectEl.value || "");
   updateRunInUrl(name);
@@ -1025,6 +1749,8 @@ for (const target of focusTargets) {
     if (ex) renderExample(ex, { focus: false, focusTag: target.tag });
   });
 }
+
+updateSearchToggleLabel();
 
 initViewer()
   .then(() => {

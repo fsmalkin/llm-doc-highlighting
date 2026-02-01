@@ -66,7 +66,7 @@ Run:
 python scripts\demo_server.py
 ```
 
-Open the URL printed at startup (default `http://127.0.0.1:8004/`).
+Open the URL printed at startup (default `http://127.0.0.1:8004/`). The landing page links to the demo; you can also go directly to `/demo.html`.
 
 Fixed document:
 ```
@@ -96,9 +96,9 @@ Review in the demo UI:
 
 Notes on GT quality:
 - FUNSD has known GT issues. Track corrections under `data/gt_corrections/funsd/`.
-- See `docs/gt-corrections.md` for the CVAT-based workflow.
+- See `docs/gt-corrections.md` for the Eval Review workflow (CVAT optional).
 
-## 8) Import CVAT corrections
+## 8) Import CVAT corrections (optional)
 
 After exporting CVAT annotations.xml (CVAT for images 1.1), import to repo JSON:
 ```bash

@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+GT_CORRECTIONS_ROOT = REPO_ROOT / "data" / "gt_corrections" / "funsd"
 
 
 def _resolve_dataset_root(data_dir: pathlib.Path) -> pathlib.Path:
@@ -75,10 +76,42 @@ def _entity_words(entity: Dict[str, Any]) -> List[Dict[str, Any]]:
 
 
 def _entity_text(entity: Dict[str, Any]) -> str:
-    words = _entity_words(entity)
-    if words:
-        return " ".join([w["text"] for w in words]).strip()
     return str(entity.get("text") or "").strip()
+
+
+def _normalize_label(text: str) -> str:
+    cleaned = " ".join(str(text or "").strip().split())
+    cleaned = cleaned.rstrip(":")
+    return cleaned.lower()
+
+
+def _load_gt_corrections(doc_id: str) -> Dict[str, Any]:
+    path = GT_CORRECTIONS_ROOT / f"{doc_id}.json"
+    if not path.exists():
+        return {"by_id": {}, "by_label": {}}
+    try:
+        payload = _load_json(path)
+    except Exception:
+        return {"by_id": {}, "by_label": {}}
+    items = payload.get("items") or []
+    by_id: Dict[str, Dict[str, Any]] = {}
+    by_label: Dict[str, Dict[str, Any]] = {}
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        ex_id = None
+        links = item.get("links") or {}
+        if isinstance(links, dict):
+            ex_id = links.get("eval_example_id")
+        if not ex_id:
+            ex_id = item.get("item_id")
+        if ex_id:
+            by_id[str(ex_id)] = item
+            continue
+        label_key = _normalize_label(item.get("field_label") or "")
+        if label_key:
+            by_label[label_key] = item
+    return {"by_id": by_id, "by_label": by_label}
 
 
 def _sort_words(words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -90,6 +123,20 @@ def _sort_words(words: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         return sorted(words, key=_key)
     except Exception:
         return words
+
+
+def _sort_entities_by_box(entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _key(ent: Dict[str, Any]) -> Tuple[float, float]:
+        box = ent.get("box") or [0, 0, 0, 0]
+        try:
+            return (float(box[1]), float(box[0]))
+        except Exception:
+            return (0.0, 0.0)
+
+    try:
+        return sorted(entities, key=_key)
+    except Exception:
+        return entities
 
 
 def _build_examples(ann_path: pathlib.Path, image_path: pathlib.Path) -> List[Dict[str, Any]]:
@@ -129,9 +176,13 @@ def _build_examples(ann_path: pathlib.Path, image_path: pathlib.Path) -> List[Di
         answer_ids = list(dict.fromkeys(answer_ids))
         if not answer_ids:
             continue
+        answer_entities = [entities.get(aid, {}) for aid in answer_ids]
+        answer_entities = [ent for ent in answer_entities if isinstance(ent, dict)]
+        answer_entities = _sort_entities_by_box(answer_entities)
+
         answer_words: List[Dict[str, Any]] = []
-        for aid in answer_ids:
-            answer_words.extend(_entity_words(entities.get(aid, {})))
+        for ent in answer_entities:
+            answer_words.extend(_entity_words(ent))
         answer_words = _sort_words(answer_words)
         # Deduplicate identical word boxes to avoid doubled expected values.
         seen = set()
@@ -158,7 +209,8 @@ def _build_examples(ann_path: pathlib.Path, image_path: pathlib.Path) -> List[Di
         answer_words = unique_by_box
         if not answer_words:
             continue
-        answer_text = " ".join([w["text"] for w in answer_words]).strip()
+        answer_text_parts = [_entity_text(ent) for ent in answer_entities]
+        answer_text = " ".join([part for part in answer_text_parts if part]).strip()
         if not answer_text:
             continue
         examples.append(
@@ -484,6 +536,9 @@ def main() -> None:
     run_examples: List[Dict[str, Any]] = []
     per_method_rows: Dict[str, List[Dict[str, Any]]] = {m: [] for m in method_list}
     doc_hash_cache: Dict[str, str] = {}
+    corrections_cache: Dict[str, Dict[str, Any]] = {}
+    excluded_count = 0
+    corrected_count = 0
 
     for ex in examples:
         img_path = pathlib.Path(ex["image_path"])
@@ -495,7 +550,59 @@ def main() -> None:
             doc_hash_cache[str(pdf_path)] = doc_hash
 
         gt_boxes_raw = [w["box"] for w in ex.get("answer_words", []) if isinstance(w.get("box"), list)]
-        gt_boxes = _dedupe_boxes(gt_boxes_raw)
+        dataset_gt_boxes = _dedupe_boxes(gt_boxes_raw)
+        dataset_answer = ex.get("answer_text") or ""
+
+        doc_id = ex["doc_id"]
+        if doc_id not in corrections_cache:
+            corrections_cache[doc_id] = _load_gt_corrections(doc_id)
+        corrections = corrections_cache[doc_id]
+        ex_id = f"{doc_id}_q{ex['question_id']}"
+        correction_item = corrections.get("by_id", {}).get(ex_id)
+        if not correction_item:
+            label_key = _normalize_label(ex.get("question") or "")
+            correction_item = corrections.get("by_label", {}).get(label_key)
+
+        gt_status = "use_dataset"
+        gt_source = "dataset"
+        gt_boxes = dataset_gt_boxes
+        gt_override: Dict[str, Any] | None = None
+
+        if correction_item:
+            status = str(correction_item.get("gt_status") or "").strip().lower()
+            if not status:
+                status = "use_correction" if (correction_item.get("value") or correction_item.get("bbox") or correction_item.get("word_boxes")) else "use_dataset"
+            if status == "exclude":
+                gt_status = "exclude"
+                gt_source = "excluded"
+                gt_boxes = []
+            elif status == "use_dataset":
+                gt_status = "use_dataset"
+                gt_source = "dataset"
+                gt_boxes = dataset_gt_boxes
+            else:
+                word_boxes = correction_item.get("word_boxes") or correction_item.get("boxes") or []
+                cleaned_word_boxes = _dedupe_boxes([b for b in word_boxes if isinstance(b, list) and len(b) == 4])
+                bbox = correction_item.get("bbox")
+                corrected_boxes = cleaned_word_boxes or (_dedupe_boxes([bbox]) if isinstance(bbox, list) and len(bbox) == 4 else [])
+                if corrected_boxes:
+                    gt_status = "use_correction"
+                    gt_source = str((correction_item.get("source") or {}).get("method") or "correction")
+                    gt_boxes = corrected_boxes
+                    corrected_count += 1
+                    gt_override = {
+                        "value": correction_item.get("value") or dataset_answer,
+                        "word_boxes": cleaned_word_boxes or None,
+                        "bbox": bbox if isinstance(bbox, list) else None,
+                    }
+                else:
+                    gt_status = "use_dataset"
+                    gt_source = "dataset"
+                    gt_boxes = dataset_gt_boxes
+
+        is_excluded = gt_status == "exclude"
+        if is_excluded:
+            excluded_count += 1
 
         methods_out: Dict[str, Any] = {}
         for method in method_list:
@@ -534,19 +641,35 @@ def main() -> None:
                 "recall": 0.0,
                 "word_iou": 0.0,
             }
-            row = {
-                "span_valid": span_valid,
-                "mapping_success": mapping_success,
-                "word_iou": match["word_iou"],
-                "precision": match["precision"],
-                "recall": match["recall"],
-                "matched": match["matched"],
-                "pred_count": match["pred_count"],
-                "gt_count": match["gt_count"],
-                "used_pass2": used_pass2,
-                "latency_sec": result.get("latency_sec", 0.0),
-            }
-            per_method_rows[method].append(row)
+            if is_excluded:
+                row = {
+                    "excluded": True,
+                    "span_valid": None,
+                    "mapping_success": None,
+                    "word_iou": None,
+                    "precision": None,
+                    "recall": None,
+                    "matched": None,
+                    "pred_count": len(pred_boxes),
+                    "gt_count": len(gt_boxes),
+                    "used_pass2": None,
+                    "latency_sec": result.get("latency_sec", 0.0),
+                }
+            else:
+                row = {
+                    "excluded": False,
+                    "span_valid": span_valid,
+                    "mapping_success": mapping_success,
+                    "word_iou": match["word_iou"],
+                    "precision": match["precision"],
+                    "recall": match["recall"],
+                    "matched": match["matched"],
+                    "pred_count": match["pred_count"],
+                    "gt_count": match["gt_count"],
+                    "used_pass2": used_pass2,
+                    "latency_sec": result.get("latency_sec", 0.0),
+                }
+                per_method_rows[method].append(row)
             methods_out[method] = {
                 "ok": bool(result.get("ok")),
                 "error": result.get("error"),
@@ -568,6 +691,9 @@ def main() -> None:
                 "question": ex["question"],
                 "expected_answer": ex["answer_text"],
                 "expected_words": ex["answer_words"],
+                "gt_status": gt_status,
+                "gt_source": gt_source,
+                "gt_override": gt_override,
                 "image_path": ex["image_path"],
                 "pdf_path": str(pdf_path),
                 "methods": methods_out,
@@ -580,10 +706,12 @@ def main() -> None:
 
     out = {
         "meta": {
-            "eval_schema_version": 2,
+            "eval_schema_version": 3,
             "dataset": "FUNSD",
             "split": args.split,
             "sample_size": len(run_examples),
+            "effective_samples": max(0, len(run_examples) - excluded_count),
+            "excluded_count": excluded_count,
             "prompt_mode": args.prompt_mode,
             "value_type": args.value_type,
             "method": "compare" if args.compare else args.method,
@@ -593,6 +721,11 @@ def main() -> None:
             "iou_threshold": args.iou_thresh,
             "rails_required": _bool_env("RAILS_REQUIRED", "1"),
             "vision_primary": os.getenv("VISION_RAILS_PRIMARY", "1") != "0",
+            "gt_corrections": {
+                "root": str(GT_CORRECTIONS_ROOT).replace("\\", "/"),
+                "applied_count": corrected_count,
+                "excluded_count": excluded_count,
+            },
             "canonicalization": {
                 "dedupe_expected_words": True,
                 "dedupe_expected_boxes": True,

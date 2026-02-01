@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>LLM Doc Highlighting Demo</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <aside class="panel">
+        <div class="panel-header">
+          <div class="kicker">Interactive demo</div>
+          <h1>Ask + Highlight</h1>
+          <a class="link" href="/">Back to landing</a>
+          <p class="muted">
+            Fixed document:
+            <span class="mono">Physician_Report_Scanned-ocr.pdf</span>
+          </p>
+          <p class="muted">
+            Bring your own key: set <span class="mono">OPENAI_API_KEY</span> in a local <span class="mono">.env</span>
+            or your environment. Default model: <span class="mono">gpt-5-mini</span>.
+          </p>
+          <div class="cta-row">
+            <a class="cta-link" href="/stats.html">Open Eval Stats</a>
+            <a class="cta-link secondary" href="/eval.html">Open Eval Review</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">System status</div>
+          <details id="statusDetails" class="status-details">
+            <summary>
+              <span id="systemStatus" class="badge">checking...</span>
+              <span class="muted">Expand for details</span>
+            </summary>
+            <div class="checklist">
+              <div class="check-item">
+                <span class="check-label">Key detected</span>
+                <span id="keyStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Rails</span>
+                <span id="railsStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Rails source</span>
+                <span id="railsSource" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">OCR</span>
+                <span id="ocrStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Cache</span>
+                <span id="cacheStatus" class="badge">...</span>
+              </div>
+              <div class="check-item">
+                <span class="check-label">Model</span>
+                <span id="modelStatus" class="badge">...</span>
+              </div>
+            </div>
+            <p class="muted">
+              If a badge says "missing", set the value in <span class="mono">.env</span> and reload.
+            </p>
+          </details>
+        </div>
+
+        <div class="card">
+          <div class="tabs">
+            <button id="tabRaw" class="tab active" data-mode="raw">Raw + Fuzzy</button>
+            <button id="tabIndexed" class="tab" data-mode="indexed">Indexed</button>
+          </div>
+          <div class="row">
+            <label for="promptPreset">Quick prompts</label>
+            <select id="promptPreset">
+              <option value="">Select a prompt...</option>
+              <option value="What is the date of visit?">What is the date of visit?</option>
+              <option value="What is the second reported symptom?">What is the second reported symptom?</option>
+              <option value="What is the treatment plan?">What is the treatment plan?</option>
+              <option value="Who signed the document?">Who signed the document?</option>
+              <option value="What is the full text of the disclaimer?">What is the full text of the disclaimer?</option>
+              <option value="What happened on 9/13/2023?">What happened on 9/13/2023?</option>
+            </select>
+          </div>
+          <div class="row">
+            <label for="question">Question</label>
+            <textarea id="question" rows="4" placeholder="Ask a question about the document..."></textarea>
+          </div>
+          <div class="row">
+            <label for="valueType">Data type</label>
+            <select id="valueType">
+              <option value="Auto" selected>Auto (default)</option>
+              <option value="Date">Date</option>
+              <option value="Duration">Duration</option>
+              <option value="Name">Name</option>
+              <option value="Phone">Phone</option>
+              <option value="Email">Email</option>
+              <option value="Address">Address</option>
+              <option value="Number">Number</option>
+              <option value="Currency / Amount">Currency / Amount</option>
+              <option value="Free-text">Free-text</option>
+            </select>
+          </div>
+          <div class="btns">
+            <button id="btnAsk" class="primary">Ask</button>
+            <button id="btnClear">Clear highlights</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="label">Status</div>
+          <div id="status" class="status">Idle</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Answer</div>
+          <div id="answer" class="answer">-</div>
+          <div id="valueTypeIndicator" class="type-indicator" hidden></div>
+        </div>
+
+        <div class="card">
+          <div class="label">Source</div>
+          <div id="sourceText" class="source">-</div>
+          <div id="sourceMeta" class="source-meta">-</div>
+        </div>
+
+        <div class="card">
+          <div class="label">Why this highlight</div>
+          <div id="whySummary" class="why">-</div>
+        </div>
+
+        <div class="card">
+          <details>
+            <summary>LLM request</summary>
+            <pre id="llmRequest" class="log">-</pre>
+          </details>
+          <details>
+            <summary>LLM response</summary>
+            <pre id="llmResponse" class="log">-</pre>
+          </details>
+        </div>
+
+        <div class="card">
+          <details>
+            <summary>Debug</summary>
+            <pre id="debug" class="debug"></pre>
+          </details>
+        </div>
+      </aside>
+
+      <main class="viewer">
+        <div id="wv"></div>
+      </main>
+    </div>
+
+    <script src="/webviewer/webviewer.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

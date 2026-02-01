@@ -1,5 +1,8 @@
 ﻿# FUNSD GT Corrections (CVAT)
 
+Note: CVAT is optional. The recommended workflow is the Eval Review UI
+(see `docs/gt-corrections.md`). Use this guide only if you need CVAT.
+
 Purpose
 - You are correcting ground-truth values for form fields in FUNSD images.
 - Each annotation represents the correct VALUE for a field (not the label).

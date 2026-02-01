@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "86075409_5410",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "86075409_5410.png"
+  },
+  "items": [
+    {
+      "field_label": "To:",
+      "gt_status": "use_dataset",
+      "item_id": "86075409_5410_q1",
+      "links": {
+        "eval_example_id": "86075409_5410_q1",
+        "eval_run": "run_20260201_013602.json",
+        "eval_url_params": "run=run_20260201_013602.json&doc=86075409_5410&ex=86075409_5410_q1"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-01T18:02:17.179Z"
+      }
+    }
+  ]
+}

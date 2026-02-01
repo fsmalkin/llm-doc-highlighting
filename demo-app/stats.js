@@ -5,6 +5,8 @@ const openEvalLinkEl = document.getElementById("openEvalLink");
 const metaDatasetEl = document.getElementById("metaDataset");
 const metaSplitEl = document.getElementById("metaSplit");
 const metaSamplesEl = document.getElementById("metaSamples");
+const metaExcludedEl = document.getElementById("metaExcluded");
+const metaEffectiveEl = document.getElementById("metaEffective");
 const metaPromptEl = document.getElementById("metaPrompt");
 const metaValueTypeEl = document.getElementById("metaValueType");
 const metaModelEl = document.getElementById("metaModel");
@@ -59,9 +61,15 @@ function fmtLatency(value) {
 }
 
 function computeSummary(examples, method) {
-  const rows = (examples || []).map((ex) => ex.methods?.[method]?.metrics || {});
+  const rows = (examples || [])
+    .map((ex) => ex.methods?.[method]?.metrics || {})
+    .filter((row) => !row?.excluded);
   if (!rows.length) return {};
-  const avg = (key) => rows.reduce((sum, r) => sum + Number(r[key] || 0), 0) / rows.length;
+  const avg = (key) => {
+    const vals = rows.map((r) => Number(r[key])).filter((v) => Number.isFinite(v));
+    if (!vals.length) return 0;
+    return vals.reduce((sum, v) => sum + v, 0) / vals.length;
+  };
   return {
     span_valid_rate: avg("span_valid"),
     mapping_success_rate: avg("mapping_success"),
@@ -127,14 +135,24 @@ async function loadRun(name) {
   }
   setText(metaDatasetEl, meta.dataset);
   setText(metaSplitEl, meta.split);
-  setText(metaSamplesEl, meta.sample_size);
+  const examples = data?.examples || [];
+  const excludedFromExamples = examples.filter((ex) => ex.gt_status === "exclude").length;
+  const excluded =
+    meta.excluded_count == null
+      ? Number(meta.excluded ?? excludedFromExamples)
+      : Number(meta.excluded_count ?? excludedFromExamples);
+  const sampleSize = Number(meta.sample_size ?? examples.length);
+  const effective = Number(meta.effective_samples ?? Math.max(0, sampleSize - (Number.isFinite(excluded) ? excluded : 0)));
+  setText(metaSamplesEl, sampleSize);
+  setText(metaExcludedEl, Number.isFinite(excluded) ? excluded : "-");
+  setText(metaEffectiveEl, Number.isFinite(effective) ? effective : "-");
   setText(metaPromptEl, meta.prompt_mode);
   setText(metaValueTypeEl, meta.value_type);
   setText(metaModelEl, meta.model);
 
   const summary = data?.summary || {};
-  const rawSummary = summary.raw || computeSummary(data?.examples || [], "raw");
-  const idxSummary = summary.indexed || computeSummary(data?.examples || [], "indexed");
+  const rawSummary = summary.raw || computeSummary(examples, "raw");
+  const idxSummary = summary.indexed || computeSummary(examples, "indexed");
 
   renderSummary(rawSummary, "raw");
   renderSummary(idxSummary, "indexed");

@@ -16,8 +16,8 @@
           <p class="muted">
             Aggregate results for a single run. Use these stats to compare methods before scaling.
           </p>
-          <a class="link" href="/">Back to demo</a>
-          <a class="link" href="/gt-review.html">GT Corrections</a>
+          <a class="link" href="/demo.html">Back to demo</a>
+          <a class="link" href="/">Back to landing</a>
         </div>
 
         <div class="card">
@@ -43,6 +43,10 @@
             <div id="metaSplit" class="meta-value">-</div>
             <div class="meta-label">Samples</div>
             <div id="metaSamples" class="meta-value">-</div>
+            <div class="meta-label">Excluded</div>
+            <div id="metaExcluded" class="meta-value">-</div>
+            <div class="meta-label">Effective</div>
+            <div id="metaEffective" class="meta-value">-</div>
             <div class="meta-label">Prompt mode</div>
             <div id="metaPrompt" class="meta-value">-</div>
             <div class="meta-label">Value type</div>
@@ -126,8 +130,9 @@
         <div class="card">
           <div class="label">Notes</div>
           <p class="muted">
-            These stats reflect averages across the selected run. If you want distribution charts or
-            per-document breakdowns, we can add those next.
+            These stats reflect averages across the selected run. Samples marked as excluded are
+            skipped in scoring. If you want distribution charts or per-document breakdowns, we can
+            add those next.
           </p>
         </div>
       </main>

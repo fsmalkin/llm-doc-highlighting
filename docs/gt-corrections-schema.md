@@ -18,9 +18,11 @@ Top-level fields:
 Item fields:
 - `item_id` (string, optional; use eval example id if available)
 - `field_label` (string)
-- `value` (string)
+- `gt_status` (string, optional; `use_dataset`, `use_correction`, or `exclude`)
+- `value` (string, optional; required when `gt_status=use_correction`)
 - `value_type` (string, optional; e.g., Phone, Date, Currency)
-- `bbox` (array of 4 numbers) [x0, y0, x1, y1]
+- `bbox` (array of 4 numbers, optional) [x0, y0, x1, y1]
+- `word_boxes` (array of boxes, optional) [[x0, y0, x1, y1], ...]
 - `notes` (string, optional)
 - `source` (object, optional)
   - `tool` (string, e.g., cvat)
@@ -42,3 +44,4 @@ Conventions:
 - Use pixel coordinates with origin top-left (y increases downward).
 - Keep values minimal and exact to the corrected span.
 - Use short notes explaining why GT was wrong.
+- If `gt_status=exclude`, no value/bbox is required; the sample will be skipped in metrics.

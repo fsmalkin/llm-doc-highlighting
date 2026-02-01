@@ -41,7 +41,7 @@ FUNSD_ANNOTATION_ROOT = REPO_ROOT / "data" / "funsd" / "raw" / "dataset" / "test
 GT_CORRECTIONS_ROOT = REPO_ROOT / "data" / "gt_corrections" / "funsd"
 EVAL_REVIEW_PATH = REPO_ROOT / "docs" / "eval-review-2.md"
 
-_EVAL_CACHE: Dict[str, Any] = {"mtime": None, "docs": [], "prompts": {}}
+_EVAL_CACHE: Dict[str, Any] = {"mtime": None, "docs": [], "prompts": {}, "run_name": None, "run_map": {}}
 _GT_CACHE: Dict[str, Any] = {}
 
 
@@ -237,7 +237,9 @@ def _load_eval_prompts() -> Tuple[list[Dict[str, Any]], Dict[str, list[Dict[str,
     docs = [{"doc_id": doc_id, "prompt_count": len(items)} for doc_id, items in prompts.items()]
     docs = sorted(docs, key=lambda item: item["doc_id"])
 
-    _EVAL_CACHE.update({"mtime": mtime, "docs": docs, "prompts": prompts})
+    _EVAL_CACHE.update(
+        {"mtime": mtime, "docs": docs, "prompts": prompts, "run_name": run_name, "run_map": {}}
+    )
     return docs, prompts
 
 
@@ -313,6 +315,36 @@ def _load_funsd_gt_map(doc_id: str) -> Dict[str, list[list[float]]]:
 
     _GT_CACHE[doc_id] = {"mtime": mtime, "map": gt_map}
     return gt_map
+
+
+def _load_eval_run_map() -> Tuple[str | None, Dict[str, Any]]:
+    if _EVAL_CACHE.get("run_map"):
+        return _EVAL_CACHE.get("run_name"), _EVAL_CACHE.get("run_map", {})
+
+    run_name = _EVAL_CACHE.get("run_name")
+    if not run_name:
+        _load_eval_prompts()
+        run_name = _EVAL_CACHE.get("run_name")
+    if not run_name:
+        return None, {}
+
+    run_path = REPORTS_ROOT / run_name
+    if not run_path.exists():
+        return run_name, {}
+
+    try:
+        payload = json.loads(run_path.read_text(encoding="utf-8"))
+    except Exception:
+        return run_name, {}
+
+    run_map: Dict[str, Any] = {}
+    for ex in payload.get("examples") or []:
+        ex_id = ex.get("id")
+        if ex_id:
+            run_map[str(ex_id)] = ex
+
+    _EVAL_CACHE["run_map"] = run_map
+    return run_name, run_map
 
 
 def _run_llm(
@@ -621,7 +653,26 @@ class DemoHandler(SimpleHTTPRequestHandler):
     def _handle_gt_docs(self) -> None:
         try:
             docs, _prompts = _load_eval_prompts()
-            self._send_json({"ok": True, "docs": docs})
+            enriched = []
+            for doc in docs:
+                doc_id = doc.get("doc_id")
+                saved_count = 0
+                if doc_id:
+                    path = GT_CORRECTIONS_ROOT / f"{doc_id}.json"
+                    if path.exists():
+                        try:
+                            payload = json.loads(path.read_text(encoding="utf-8"))
+                            saved_count = len(payload.get("items") or [])
+                        except Exception:
+                            saved_count = 0
+                enriched.append(
+                    {
+                        "doc_id": doc_id,
+                        "prompt_count": doc.get("prompt_count", 0),
+                        "saved_count": saved_count,
+                    }
+                )
+            self._send_json({"ok": True, "docs": enriched})
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
 
@@ -630,16 +681,35 @@ class DemoHandler(SimpleHTTPRequestHandler):
             parsed = urllib.parse.urlparse(self.path)
             params = urllib.parse.parse_qs(parsed.query or "")
             doc_id = params.get("doc", [""])[0].strip()
+            method = params.get("method", ["raw"])[0].strip() or "raw"
             if not doc_id or "/" in doc_id or "\\" in doc_id:
                 self._send_json({"ok": False, "error": "Invalid doc id"}, status=HTTPStatus.BAD_REQUEST)
                 return
             _docs, prompts = _load_eval_prompts()
             items = prompts.get(doc_id, [])
             gt_map = _load_funsd_gt_map(doc_id)
+            _run_name, run_map = _load_eval_run_map()
             for item in items:
                 label = str(item.get("field_label") or "")
                 key = _normalize_label(label)
                 item["gt_boxes"] = gt_map.get(key, [])
+                example_id = item.get("example_id")
+                if example_id and example_id in run_map:
+                    ex = run_map.get(example_id) or {}
+                    method_data = (ex.get("methods") or {}).get(method) or {}
+                    answer = method_data.get("answer")
+                    bbox = None
+                    mapped = method_data.get("mapped") or {}
+                    pages = mapped.get("pages") or []
+                    if pages:
+                        bbox = pages[0].get("bbox_abs")
+                    if answer:
+                        item["suggested"] = {
+                            "method": method,
+                            "answer": answer,
+                            "bbox": bbox,
+                            "value_type": method_data.get("value_type"),
+                        }
             self._send_json({"ok": True, "doc_id": doc_id, "prompts": items})
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)
@@ -701,21 +771,70 @@ class DemoHandler(SimpleHTTPRequestHandler):
                     dropped += 1
                     continue
                 field_label = str(item.get("field_label") or "").strip()
+                if not field_label:
+                    dropped += 1
+                    continue
+
+                gt_status = str(item.get("gt_status") or "").strip().lower()
+                if gt_status not in ("", "use_dataset", "use_correction", "exclude"):
+                    dropped += 1
+                    continue
+
                 value = str(item.get("value") or "").strip()
                 bbox = item.get("bbox")
-                if not field_label or not value or not isinstance(bbox, list) or len(bbox) != 4:
-                    dropped += 1
-                    continue
-                try:
-                    bbox_vals = [round(float(v), 2) for v in bbox]
-                except Exception:
-                    dropped += 1
-                    continue
+                word_boxes = item.get("word_boxes") or item.get("boxes")
+
+                cleaned_word_boxes: list[list[float]] = []
+                if isinstance(word_boxes, list):
+                    for wb in word_boxes:
+                        if not isinstance(wb, list) or len(wb) != 4:
+                            continue
+                        try:
+                            cleaned_word_boxes.append([round(float(v), 2) for v in wb])
+                        except Exception:
+                            continue
+
+                bbox_vals: list[float] | None = None
+                if isinstance(bbox, list) and len(bbox) == 4:
+                    try:
+                        bbox_vals = [round(float(v), 2) for v in bbox]
+                    except Exception:
+                        bbox_vals = None
+
+                if not gt_status:
+                    if value or bbox_vals or cleaned_word_boxes:
+                        gt_status = "use_correction"
+                    else:
+                        gt_status = "use_dataset"
+
+                if gt_status == "use_correction":
+                    if not value:
+                        dropped += 1
+                        continue
+                    if not bbox_vals and cleaned_word_boxes:
+                        xs = [b[0] for b in cleaned_word_boxes] + [b[2] for b in cleaned_word_boxes]
+                        ys = [b[1] for b in cleaned_word_boxes] + [b[3] for b in cleaned_word_boxes]
+                        if xs and ys:
+                            bbox_vals = [
+                                round(min(xs), 2),
+                                round(min(ys), 2),
+                                round(max(xs), 2),
+                                round(max(ys), 2),
+                            ]
+                    if not bbox_vals and not cleaned_word_boxes:
+                        dropped += 1
+                        continue
+
                 cleaned_item: Dict[str, Any] = {
                     "field_label": field_label,
-                    "value": value,
-                    "bbox": bbox_vals,
+                    "gt_status": gt_status,
                 }
+                if value:
+                    cleaned_item["value"] = value
+                if bbox_vals:
+                    cleaned_item["bbox"] = bbox_vals
+                if cleaned_word_boxes:
+                    cleaned_item["word_boxes"] = cleaned_word_boxes
                 if item.get("value_type"):
                     cleaned_item["value_type"] = str(item.get("value_type"))
                 if item.get("notes"):
@@ -727,7 +846,10 @@ class DemoHandler(SimpleHTTPRequestHandler):
                 if item.get("source"):
                     cleaned_item["source"] = item.get("source")
                 else:
-                    cleaned_item["source"] = {"tool": "gt-review-ui", "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
+                    cleaned_item["source"] = {
+                        "tool": "eval-viewer",
+                        "saved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    }
                 cleaned.append(cleaned_item)
 
             if not cleaned:
@@ -735,7 +857,7 @@ class DemoHandler(SimpleHTTPRequestHandler):
                 return
 
             payload = {
-                "schema_version": 1,
+                "schema_version": 2,
                 "dataset": "funsd",
                 "doc_id": doc_id,
                 "doc_page": 1,
