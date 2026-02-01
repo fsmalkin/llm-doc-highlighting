@@ -37,10 +37,12 @@ DEFAULT_MODEL = "gpt-5-mini"
 REPORTS_ROOT = REPO_ROOT / "reports" / "funsd"
 FUNSD_PDF_ROOT = REPO_ROOT / "data" / "funsd" / "pdf"
 FUNSD_IMAGE_ROOT = REPO_ROOT / "data" / "funsd" / "raw" / "dataset" / "testing_data" / "images"
+FUNSD_ANNOTATION_ROOT = REPO_ROOT / "data" / "funsd" / "raw" / "dataset" / "testing_data" / "annotations"
 GT_CORRECTIONS_ROOT = REPO_ROOT / "data" / "gt_corrections" / "funsd"
 EVAL_REVIEW_PATH = REPO_ROOT / "docs" / "eval-review-2.md"
 
 _EVAL_CACHE: Dict[str, Any] = {"mtime": None, "docs": [], "prompts": {}}
+_GT_CACHE: Dict[str, Any] = {}
 
 
 def _load_env(dotenv_paths: list[pathlib.Path]) -> None:
@@ -250,6 +252,67 @@ def _find_funsd_image(doc_id: str) -> pathlib.Path | None:
         if candidate.is_file():
             return candidate
     return None
+
+
+def _normalize_label(text: str) -> str:
+    cleaned = re.sub(r"\s+", " ", text.strip())
+    cleaned = cleaned.rstrip(":")
+    return cleaned.lower()
+
+
+def _load_funsd_gt_map(doc_id: str) -> Dict[str, list[list[float]]]:
+    ann_path = FUNSD_ANNOTATION_ROOT / f"{doc_id}.json"
+    if not ann_path.exists():
+        return {}
+    mtime = ann_path.stat().st_mtime
+    cached = _GT_CACHE.get(doc_id)
+    if cached and cached.get("mtime") == mtime:
+        return cached.get("map", {})
+
+    data = json.loads(ann_path.read_text(encoding="utf-8"))
+    form = data.get("form") or []
+    by_id = {item.get("id"): item for item in form if isinstance(item, dict)}
+
+    gt_map: Dict[str, list[list[float]]] = {}
+    for item in form:
+        if not isinstance(item, dict):
+            continue
+        if item.get("label") != "question":
+            continue
+        qid = item.get("id")
+        qtext = str(item.get("text") or "")
+        qkey = _normalize_label(qtext)
+        answer_boxes: list[list[float]] = []
+        for link in item.get("linking") or []:
+            if not isinstance(link, list) or len(link) != 2:
+                continue
+            other_id = None
+            if link[0] == qid:
+                other_id = link[1]
+            elif link[1] == qid:
+                other_id = link[0]
+            if other_id is None:
+                continue
+            other = by_id.get(other_id)
+            if not other or not isinstance(other, dict):
+                continue
+            if other.get("label") not in ("answer", "other"):
+                continue
+            box = other.get("box")
+            if isinstance(box, list) and len(box) == 4:
+                try:
+                    answer_boxes.append([float(v) for v in box])
+                except Exception:
+                    continue
+        if not answer_boxes:
+            continue
+        existing = gt_map.setdefault(qkey, [])
+        for bbox in answer_boxes:
+            if bbox not in existing:
+                existing.append(bbox)
+
+    _GT_CACHE[doc_id] = {"mtime": mtime, "map": gt_map}
+    return gt_map
 
 
 def _run_llm(
@@ -572,6 +635,11 @@ class DemoHandler(SimpleHTTPRequestHandler):
                 return
             _docs, prompts = _load_eval_prompts()
             items = prompts.get(doc_id, [])
+            gt_map = _load_funsd_gt_map(doc_id)
+            for item in items:
+                label = str(item.get("field_label") or "")
+                key = _normalize_label(label)
+                item["gt_boxes"] = gt_map.get(key, [])
             self._send_json({"ok": True, "doc_id": doc_id, "prompts": items})
         except Exception as exc:
             self._send_json({"ok": False, "error": str(exc)}, status=HTTPStatus.INTERNAL_SERVER_ERROR)

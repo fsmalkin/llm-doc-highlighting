@@ -17,6 +17,10 @@ const state = {
   prompts: [],
   items: [],
   selectedKey: null,
+  promptFilter: "",
+  docFilter: "",
+  showGt: false,
+  showSaved: true,
   image: {
     naturalWidth: 1,
     naturalHeight: 1,
@@ -27,9 +31,17 @@ const state = {
 
 const dom = {
   docSelect: document.getElementById("docSelect"),
+  docSearch: document.getElementById("docSearch"),
   docMeta: document.getElementById("docMeta"),
+  promptSearch: document.getElementById("promptSearch"),
   promptList: document.getElementById("promptList"),
   addCustom: document.getElementById("addCustom"),
+  expectedText: document.getElementById("expectedText"),
+  rawText: document.getElementById("rawText"),
+  indexedText: document.getElementById("indexedText"),
+  toggleGt: document.getElementById("toggleGt"),
+  toggleSaved: document.getElementById("toggleSaved"),
+  gtHint: document.getElementById("gtHint"),
   fieldLabel: document.getElementById("fieldLabel"),
   valueInput: document.getElementById("valueInput"),
   valueType: document.getElementById("valueType"),
@@ -44,6 +56,8 @@ const dom = {
   statusText: document.getElementById("statusText"),
   docImage: document.getElementById("docImage"),
   overlay: document.getElementById("overlay"),
+  viewerStage: document.querySelector(".viewer-stage"),
+  imageLayer: document.querySelector(".image-layer"),
 };
 
 let dragState = null;
@@ -77,6 +91,7 @@ function buildItemFromPrompt(prompt) {
     notes: "",
     bbox: null,
     prompt,
+    gt_boxes: prompt.gt_boxes || [],
     links: {
       eval_example_id: prompt.example_id || "",
       eval_run: prompt.run || "",
@@ -123,13 +138,7 @@ async function loadDocs() {
   setStatus("Loading documents...");
   const data = await fetchJson("/api/gt/docs");
   state.docs = data.docs || [];
-  dom.docSelect.innerHTML = "";
-  state.docs.forEach((doc) => {
-    const opt = document.createElement("option");
-    opt.value = doc.doc_id;
-    opt.textContent = `${doc.doc_id} (${doc.prompt_count})`;
-    dom.docSelect.appendChild(opt);
-  });
+  renderDocOptions();
   const params = new URLSearchParams(window.location.search);
   const docParam = params.get("doc");
   if (docParam && state.docs.some((d) => d.doc_id === docParam)) {
@@ -215,6 +224,23 @@ async function loadDoc(docId) {
   setStatus("Ready. Drag on the image to draw a box.");
 }
 
+function renderDocOptions() {
+  const filter = state.docFilter.trim().toLowerCase();
+  dom.docSelect.innerHTML = "";
+  const docs = state.docs.filter((doc) => doc.doc_id.toLowerCase().includes(filter));
+  docs.forEach((doc) => {
+    const opt = document.createElement("option");
+    opt.value = doc.doc_id;
+    opt.textContent = `${doc.doc_id} (${doc.prompt_count})`;
+    dom.docSelect.appendChild(opt);
+  });
+  if (!docs.find((doc) => doc.doc_id === dom.docSelect.value)) {
+    if (docs[0]) {
+      dom.docSelect.value = docs[0].doc_id;
+    }
+  }
+}
+
 async function loadImage(docId) {
   return new Promise((resolve, reject) => {
     dom.docImage.onload = () => {
@@ -233,18 +259,27 @@ async function loadImage(docId) {
 }
 
 function updateCanvasSize() {
-  const rect = dom.docImage.getBoundingClientRect();
-  state.image.displayWidth = rect.width || 1;
-  state.image.displayHeight = rect.height || 1;
-  dom.overlay.width = rect.width;
-  dom.overlay.height = rect.height;
-  dom.overlay.style.left = `${dom.docImage.offsetLeft}px`;
-  dom.overlay.style.top = `${dom.docImage.offsetTop}px`;
+  const width = dom.docImage.clientWidth || 1;
+  const height = dom.docImage.clientHeight || 1;
+  state.image.displayWidth = width;
+  state.image.displayHeight = height;
+  dom.overlay.width = width;
+  dom.overlay.height = height;
+  dom.overlay.style.left = "0px";
+  dom.overlay.style.top = "0px";
 }
 
 function renderPromptList() {
   dom.promptList.innerHTML = "";
-  state.items.forEach((item) => {
+  const filter = state.promptFilter.trim().toLowerCase();
+  state.items
+    .filter((item) => {
+      if (!filter) return true;
+      const label = (item.field_label || "").toLowerCase();
+      const expected = (item.prompt && item.prompt.expected) ? item.prompt.expected.toLowerCase() : "";
+      return label.includes(filter) || expected.includes(filter);
+    })
+    .forEach((item) => {
     const btn = document.createElement("button");
     btn.className = "prompt-item" + (item.key === state.selectedKey ? " active" : "");
     btn.type = "button";
@@ -267,8 +302,13 @@ function renderPromptList() {
     const boxChip = document.createElement("span");
     boxChip.className = "chip" + (item.bbox ? " ok" : " warn");
     boxChip.textContent = item.bbox ? "bbox" : "no bbox";
+    const gtChip = document.createElement("span");
+    const gtCount = (item.prompt && item.prompt.gt_boxes) ? item.prompt.gt_boxes.length : 0;
+    gtChip.className = "chip gt";
+    gtChip.textContent = gtCount ? `gt ${gtCount}` : "gt -";
     chips.appendChild(valChip);
     chips.appendChild(boxChip);
+    chips.appendChild(gtChip);
     btn.appendChild(title);
     btn.appendChild(meta);
     btn.appendChild(chips);
@@ -281,11 +321,15 @@ function selectItem(key) {
   const item = state.items.find((entry) => entry.key === key);
   if (!item) return;
   state.selectedKey = key;
+  dom.expectedText.textContent = item.prompt && item.prompt.expected ? item.prompt.expected : "-";
+  dom.rawText.textContent = item.prompt && item.prompt.raw ? item.prompt.raw : "-";
+  dom.indexedText.textContent = item.prompt && item.prompt.indexed ? item.prompt.indexed : "-";
   dom.fieldLabel.value = item.field_label || "";
   dom.valueInput.value = item.value || "";
   dom.valueType.value = item.value_type || "";
   dom.notesInput.value = item.notes || "";
   dom.bboxInput.value = item.bbox ? item.bbox.join(", ") : "";
+  updateGtHint();
   renderPromptList();
   renderOverlay();
 }
@@ -308,17 +352,47 @@ function renderOverlay() {
   const ctx = dom.overlay.getContext("2d");
   ctx.clearRect(0, 0, dom.overlay.width, dom.overlay.height);
   const { scaleX, scaleY } = getScale();
-  state.items.forEach((item) => {
-    if (!item.bbox) return;
-    const [x0, y0, x1, y1] = item.bbox;
-    const left = x0 / scaleX;
-    const top = y0 / scaleY;
-    const width = (x1 - x0) / scaleX;
-    const height = (y1 - y0) / scaleY;
-    ctx.lineWidth = item.key === state.selectedKey ? 3 : 2;
-    ctx.strokeStyle = item.key === state.selectedKey ? "#8bd5ca" : "#7aa2f7";
-    ctx.strokeRect(left, top, width, height);
-  });
+  if (state.showSaved) {
+    state.items.forEach((item) => {
+      if (!item.bbox) return;
+      const [x0, y0, x1, y1] = item.bbox;
+      const left = x0 / scaleX;
+      const top = y0 / scaleY;
+      const width = (x1 - x0) / scaleX;
+      const height = (y1 - y0) / scaleY;
+      ctx.lineWidth = item.key === state.selectedKey ? 3 : 2;
+      ctx.strokeStyle = item.key === state.selectedKey ? "#8bd5ca" : "#7aa2f7";
+      ctx.strokeRect(left, top, width, height);
+    });
+  } else {
+    const selected = state.items.find((entry) => entry.key === state.selectedKey);
+    if (selected && selected.bbox) {
+      const [x0, y0, x1, y1] = selected.bbox;
+      const left = x0 / scaleX;
+      const top = y0 / scaleY;
+      const width = (x1 - x0) / scaleX;
+      const height = (y1 - y0) / scaleY;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "#8bd5ca";
+      ctx.strokeRect(left, top, width, height);
+    }
+  }
+
+  if (state.showGt) {
+    const selected = state.items.find((entry) => entry.key === state.selectedKey);
+    const gtBoxes = selected && selected.prompt ? selected.prompt.gt_boxes || [] : [];
+    gtBoxes.forEach((bbox) => {
+      if (!bbox || bbox.length !== 4) return;
+      const [x0, y0, x1, y1] = bbox;
+      const left = x0 / scaleX;
+      const top = y0 / scaleY;
+      const width = (x1 - x0) / scaleX;
+      const height = (y1 - y0) / scaleY;
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = "#7ee787";
+      ctx.strokeRect(left, top, width, height);
+    });
+  }
 
   if (dragState && dragState.preview) {
     ctx.lineWidth = 2;
@@ -418,6 +492,19 @@ function wireEvents() {
     loadDoc(event.target.value);
   });
 
+  dom.docSearch.addEventListener("input", (event) => {
+    state.docFilter = event.target.value || "";
+    renderDocOptions();
+    if (dom.docSelect.value && dom.docSelect.value !== state.docId) {
+      loadDoc(dom.docSelect.value);
+    }
+  });
+
+  dom.promptSearch.addEventListener("input", (event) => {
+    state.promptFilter = event.target.value || "";
+    renderPromptList();
+  });
+
   dom.addCustom.addEventListener("click", () => {
     const item = buildCustomItem();
     state.items.push(item);
@@ -472,6 +559,24 @@ function wireEvents() {
 
   dom.saveBtn.addEventListener("click", saveCorrections);
 
+  dom.toggleGt.addEventListener("click", () => {
+    state.showGt = !state.showGt;
+    updateGtHint();
+    renderOverlay();
+  });
+
+  dom.toggleSaved.addEventListener("click", () => {
+    state.showSaved = !state.showSaved;
+    updateSavedToggle();
+    renderOverlay();
+  });
+
+  dom.expectedText.addEventListener("click", () => {
+    state.showGt = true;
+    updateGtHint();
+    renderOverlay();
+  });
+
   dom.docImage.addEventListener("load", updateCanvasSize);
   window.addEventListener("resize", () => {
     updateCanvasSize();
@@ -481,8 +586,26 @@ function wireEvents() {
   dom.overlay.addEventListener("mousedown", onMouseDown);
 }
 
+function updateGtHint() {
+  const selected = state.items.find((entry) => entry.key === state.selectedKey);
+  const gtBoxes = selected && selected.prompt ? selected.prompt.gt_boxes || [] : [];
+  if (gtBoxes.length) {
+    dom.gtHint.textContent = `GT boxes: ${gtBoxes.length}`;
+  } else {
+    dom.gtHint.textContent = "GT boxes: none detected for this label.";
+  }
+  dom.toggleGt.textContent = state.showGt ? "Hide GT boxes" : "Reveal GT boxes";
+  dom.toggleGt.classList.toggle("active", state.showGt);
+}
+
+function updateSavedToggle() {
+  dom.toggleSaved.textContent = state.showSaved ? "Show saved boxes" : "Hide saved boxes";
+  dom.toggleSaved.classList.toggle("active", state.showSaved);
+}
+
 updateValueTypeOptions();
 wireEvents();
+updateSavedToggle();
 loadDocs().catch((err) => {
   setStatus(err.message || "Failed to load docs");
 });

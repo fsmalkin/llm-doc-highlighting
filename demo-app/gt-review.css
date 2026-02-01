@@ -6,6 +6,35 @@
   margin-bottom: 16px;
 }
 
+.step-card {
+  border: 1px solid rgba(122, 162, 247, 0.15);
+}
+
+.step-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.step-num {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(122, 162, 247, 0.18);
+  color: var(--accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.step-title {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
 .gt-viewer {
   background: var(--panel-2);
   display: flex;
@@ -31,6 +60,11 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
+}
+
+.image-layer {
+  position: relative;
+  display: inline-block;
 }
 
 .viewer-stage img {
@@ -80,6 +114,39 @@
   color: var(--muted);
 }
 
+.info-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 6px 10px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border-radius: 10px;
+  background: #0b1220;
+  border: 1px solid var(--border);
+}
+
+.info-label {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.info-value {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.toggle-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.toggle-row .ghost.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px rgba(122, 162, 247, 0.3);
+  color: var(--accent);
+}
+
 .prompt-chips {
   display: flex;
   gap: 6px;
@@ -103,6 +170,11 @@
 .chip.warn {
   border-color: rgba(255, 123, 114, 0.6);
   color: var(--bad);
+}
+
+.chip.gt {
+  border-color: rgba(126, 231, 135, 0.6);
+  color: var(--good);
 }
 
 .field {
@@ -184,6 +256,10 @@
 
 .swatch.other {
   border-color: #7aa2f7;
+}
+
+.swatch.gt {
+  border-color: #7ee787;
 }
 
 .status.small {

@@ -23,20 +23,62 @@
           </div>
         </div>
 
-        <div class="card">
-          <div class="label">Document</div>
-          <select id="docSelect" class="full"></select>
+        <div class="card step-card">
+          <div class="step-header">
+            <span class="step-num">1</span>
+            <div>
+              <div class="step-title">Choose a document</div>
+              <div class="muted small">Pick the doc you want to review.</div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="docSearch">Search docs</label>
+            <input id="docSearch" type="text" placeholder="Filter by doc id..." />
+          </div>
+          <div class="field">
+            <label for="docSelect">Document</label>
+            <select id="docSelect" class="full"></select>
+          </div>
           <div id="docMeta" class="muted small"></div>
         </div>
 
-        <div class="card">
-          <div class="label">Prompts</div>
+        <div class="card step-card">
+          <div class="step-header">
+            <span class="step-num">2</span>
+            <div>
+              <div class="step-title">Choose a prompt</div>
+              <div class="muted small">Select the field label you want to verify.</div>
+            </div>
+          </div>
+          <div class="field">
+            <label for="promptSearch">Search prompts</label>
+            <input id="promptSearch" type="text" placeholder="Filter by label or value..." />
+          </div>
           <div id="promptList" class="prompt-list"></div>
           <button id="addCustom" class="ghost">Add custom correction</button>
         </div>
 
-        <div class="card">
-          <div class="label">Selected item</div>
+        <div class="card step-card">
+          <div class="step-header">
+            <span class="step-num">3</span>
+            <div>
+              <div class="step-title">Correct the value</div>
+              <div class="muted small">Draw a box, edit the value, and save.</div>
+            </div>
+          </div>
+          <div class="info-grid">
+            <div class="info-label">Expected (GT)</div>
+            <div id="expectedText" class="info-value">-</div>
+            <div class="info-label">Raw answer</div>
+            <div id="rawText" class="info-value">-</div>
+            <div class="info-label">Indexed answer</div>
+            <div id="indexedText" class="info-value">-</div>
+          </div>
+          <div class="toggle-row">
+            <button id="toggleGt" class="ghost">Reveal GT boxes</button>
+            <button id="toggleSaved" class="ghost active">Show saved boxes</button>
+          </div>
+          <div id="gtHint" class="muted small"></div>
           <div class="field">
             <label for="fieldLabel">Field label</label>
             <input id="fieldLabel" type="text" />
@@ -84,11 +126,16 @@
             <span class="legend-item">
               <span class="swatch other"></span>Other saved boxes
             </span>
+            <span class="legend-item">
+              <span class="swatch gt"></span>GT boxes
+            </span>
           </div>
         </div>
         <div class="viewer-stage">
-          <img id="docImage" alt="Document" />
-          <canvas id="overlay"></canvas>
+          <div class="image-layer">
+            <img id="docImage" alt="Document" />
+            <canvas id="overlay"></canvas>
+          </div>
         </div>
       </main>
     </div>
