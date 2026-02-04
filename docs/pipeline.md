@@ -22,6 +22,29 @@ Notes:
 - Vision rails are the primary method when credentials are present; set VISION_RAILS_PRIMARY=0 to allow fallback.
 - Tesseract OCR is the fallback for sparse/no text layer when fallback is allowed.
 
+### Phase 1 flow (data + artifacts)
+
+```mermaid
+flowchart TB
+  A[PDF document] --> B[preprocess_document.py]
+  B --> C[fine_geometry.py]
+  B --> D[sentence_indexer.py]
+  C --> E[fine_geometry.json]
+  D --> F[sentence_index.json]
+  E --> G[build_geometry_index.py]
+  F --> G
+  G --> H[geometry_index.json]
+  B --> I[ade_adapter.py (optional)]
+  I --> J[ade_raw.json / ade_chunks.json]
+```
+
+Key code
+- Preprocess entrypoint: `scripts/preprocess_document.py`
+- Fine geometry extraction: `scripts/fine_geometry.py`
+- Sentence index: `scripts/sentence_indexer.py`
+- Geometry index builder: `scripts/build_geometry_index.py`
+- Optional provider chunks: `scripts/ade_adapter.py`
+
 ## Phase 2: Resolve (highlight mapping)
 
 Goal: map a question (or citation) to concrete geometry.
@@ -56,6 +79,47 @@ Raw + fuzzy (two-pass):
 Deterministic fallback:
 - When the LLM is unavailable (no key) or returns invalid spans, fall back to exact substring matching on line text and map to a contiguous token window when possible.
 
+### Phase 2 flow (resolvers)
+
+```mermaid
+flowchart TB
+  A[geometry_index.json] --> B[reading_view.py]
+  B --> C[Reading view with token indices]
+  C --> D[Indexed resolver]
+  C --> E[Raw + fuzzy resolver]
+  D --> F[Span citation]
+  E --> G[raw + raw_extra]
+  G --> H{Unique match?}
+  H -->|yes| I[Map to word_ids]
+  H -->|no| J[Pass2: indexed resolver]
+  J --> I
+  F --> I
+  I --> K[Word boxes for viewer]
+```
+
+Key code
+- Reading view assembly: `scripts/reading_view.py`
+- Indexed resolver: `scripts/llm_resolve_span.py`
+- Raw + fuzzy resolver: `scripts/two_pass_resolve_span.py`
+- Deterministic fallback: `scripts/resolve_highlight.py`
+
 ## Next experiment: iterative evaluation
 
 See `docs/next-steps.md` for an evaluation plan that starts with small samples, verifies end-to-end reporting, then scales. The plan includes A/B comparison between indexed and raw+fuzzy methods.
+
+### Evaluation flow (FUNSD)
+
+```mermaid
+flowchart LR
+  A[FUNSD dataset] --> B[funsd_eval.py]
+  B --> C[run_*.json report]
+  C --> D[Stats view]
+  C --> E[Eval Review UI]
+  C --> F[Overlay gallery]
+  E --> G[GT corrections]
+  G --> B
+```
+
+Key code
+- FUNSD evaluator: `scripts/funsd_eval.py`
+- Overlay renderer: `scripts/render_funsd_overlays.py`

@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "86236474_6476",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "86236474_6476.png"
+  },
+  "items": [
+    {
+      "field_label": "DIRECT ACCOUNT CHAINS:",
+      "gt_status": "use_dataset",
+      "item_id": "86236474_6476_q14",
+      "links": {
+        "eval_example_id": "86236474_6476_q14",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=86236474_6476&ex=86236474_6476_q14"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T13:15:46.993Z"
+      }
+    },
+    {
+      "field_label": "TO:",
+      "gt_status": "use_dataset",
+      "item_id": "86236474_6476_q0",
+      "links": {
+        "eval_example_id": "86236474_6476_q0",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=86236474_6476&ex=86236474_6476_q0"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T13:16:10.723Z"
+      }
+    }
+  ]
+}

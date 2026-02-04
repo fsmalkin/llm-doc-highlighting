@@ -71,7 +71,7 @@
                 <div id="rawMapping" class="stat-value">-</div>
               </div>
               <div class="stat">
-                <div class="stat-label">Avg word IoU</div>
+                <div class="stat-label">Avg overlap score (lenient)</div>
                 <div id="rawIoU" class="stat-value">-</div>
               </div>
               <div class="stat">
@@ -105,7 +105,7 @@
                 <div id="idxMapping" class="stat-value">-</div>
               </div>
               <div class="stat">
-                <div class="stat-label">Avg word IoU</div>
+                <div class="stat-label">Avg overlap score (lenient)</div>
                 <div id="idxIoU" class="stat-value">-</div>
               </div>
               <div class="stat">
@@ -131,8 +131,8 @@
           <div class="label">Notes</div>
           <p class="muted">
             These stats reflect averages across the selected run. Samples marked as excluded are
-            skipped in scoring. If you want distribution charts or per-document breakdowns, we can
-            add those next.
+            skipped in scoring. Overlap score uses the lenient matching settings in the run JSON.
+            If you want distribution charts or per-document breakdowns, we can add those next.
           </p>
         </div>
       </main>

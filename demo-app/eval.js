@@ -27,12 +27,12 @@ const gtStatusNoteEl = document.getElementById("gtStatusNote");
 const gtDecisionInputs = Array.from(document.querySelectorAll('input[name="gtDecision"]'));
 const gtExcludeEl = document.getElementById("gtExclude");
 const gtApplyBtn = document.getElementById("gtApplyBtn");
+const gtDirtyChipEl = document.getElementById("gtDirtyChip");
 const gtExcludedCountEl = document.getElementById("gtExcludedCount");
 const gtNoteEl = document.getElementById("gtNote");
 const gtNoteWrapEl = document.getElementById("gtNoteWrap");
 const gtNoteToggleEl = document.getElementById("toggleGtNote");
 const gtEmptyStateEl = document.getElementById("gtEmptyState");
-const gtMarkReviewedBtn = document.getElementById("gtMarkReviewedBtn");
 
 const metricRawIouEl = document.getElementById("metricRawIou");
 const metricRawPrecisionEl = document.getElementById("metricRawPrecision");
@@ -212,6 +212,7 @@ function updateMetrics(rawMetrics, indexedMetrics) {
   }
 
   const alignThreshold = 0.85;
+  const alignLabel = alignThreshold.toFixed(2);
   const rawAligned = Number(rawMetrics?.word_iou || 0) >= alignThreshold && !rawMetrics?.excluded;
   const idxAligned = Number(indexedMetrics?.word_iou || 0) >= alignThreshold && !indexedMetrics?.excluded;
   let status = "Needs review";
@@ -229,11 +230,11 @@ function updateMetrics(rawMetrics, indexedMetrics) {
   }
   if (abStatusNoteEl) {
     if (status === "Aligned") {
-      abStatusNoteEl.textContent = "GT matches both methods at IoU >= 0.85.";
+      abStatusNoteEl.textContent = `GT matches both methods at overlap score >= ${alignLabel}.`;
     } else if (status === "Partial") {
-      abStatusNoteEl.textContent = "Only one method aligns with GT at IoU >= 0.85.";
+      abStatusNoteEl.textContent = `Only one method aligns at overlap score >= ${alignLabel}.`;
     } else {
-      abStatusNoteEl.textContent = "Neither method aligns at IoU >= 0.85.";
+      abStatusNoteEl.textContent = `Neither method aligns at overlap score >= ${alignLabel}.`;
     }
   }
 }
@@ -429,12 +430,18 @@ function updateDocReviewStatus(docId) {
   const reviewedCount = stats.reviewedCount;
   const totalCount = stats.totalCount;
   let status = "Not reviewed";
+  let variant = "warn";
   if (totalCount && reviewedCount >= totalCount) {
     status = "Fully reviewed";
+    variant = "good";
   } else if (reviewedCount > 0) {
     status = "Partially reviewed";
+    variant = "warn";
   }
-  if (docReviewStatusEl) docReviewStatusEl.textContent = status;
+  if (docReviewStatusEl) {
+    docReviewStatusEl.textContent = status;
+    setBadgeVariant(docReviewStatusEl, variant);
+  }
   if (docReviewCountsEl) docReviewCountsEl.textContent = `${reviewedCount}/${totalCount} fields reviewed`;
 }
 
@@ -445,6 +452,7 @@ function updateFieldReviewStatus(ex) {
     return;
   }
   fieldReviewStatusEl.textContent = ex.reviewed ? "Reviewed" : "Not reviewed";
+  setBadgeVariant(fieldReviewStatusEl, ex.reviewed ? "good" : "warn");
 }
 
 async function hydrateReviewStats() {
@@ -505,16 +513,28 @@ function updateGtDecisionButtons(rawData, indexedData, gtResolved) {
   const currentDecision = gtResolved?.decision || "";
   const noteValue = String(gtNoteEl?.value || "").trim();
   const noteChanged = noteValue !== String(currentSavedNote || "").trim();
+  const hasSelection = Boolean(selected);
+  const canAcceptDefault = !currentDecision;
+  const dirtyDecision = hasSelection && selected !== currentDecision;
+  const isDirty = dirtyDecision || (canAcceptDefault && !hasSelection);
   if (gtApplyBtn) {
-    const hasSelection = Boolean(selected);
     gtApplyBtn.disabled =
       gtSaveInFlight ||
       !hasExample ||
-      (!hasSelection && !noteChanged) ||
-      (hasSelection && selected === currentDecision && !noteChanged);
+      (!hasSelection && !canAcceptDefault) ||
+      (hasSelection && selected === currentDecision);
+    if (!gtSaveInFlight) {
+      if (!currentDecision && !hasSelection) {
+        gtApplyBtn.textContent = "Accept GT";
+      } else if (currentDecision) {
+        gtApplyBtn.textContent = "Update decision";
+      } else {
+        gtApplyBtn.textContent = "Save decision";
+      }
+    }
   }
-  if (gtMarkReviewedBtn) {
-    gtMarkReviewedBtn.disabled = gtSaveInFlight || !hasExample;
+  if (gtDirtyChipEl) {
+    gtDirtyChipEl.style.display = isDirty ? "inline-flex" : "none";
   }
 }
 
@@ -1657,7 +1677,7 @@ gtApplyBtn?.addEventListener("click", async () => {
   if (gtSaveInFlight) return;
   const currentDecision = currentGtResolved?.decision || "";
   const noteChanged = noteValue !== String(currentSavedNote || "").trim();
-  const decision = selected || (noteChanged ? fallbackDecision : "");
+  const decision = selected || (!currentDecision ? "dataset" : "");
   if (!decision) return;
   const decisionChanged = decision !== currentDecision;
   try {
@@ -1705,24 +1725,6 @@ gtApplyBtn?.addEventListener("click", async () => {
   }
 });
 
-gtMarkReviewedBtn?.addEventListener("click", async () => {
-  if (!currentExample || gtSaveInFlight) return;
-  const noteValue = String(gtNoteEl?.value || "").trim();
-  try {
-    setGtSaving(true);
-    const item = buildStatusItem(currentExample, "use_dataset", noteValue);
-    await saveCorrection(currentExample.doc_id, item);
-    pendingDecision = "";
-    await refreshCurrentExample("gt");
-    await computeReviewStatsForDoc(currentExample.doc_id);
-    updateDocSelectLabels();
-    updateDocReviewStatus(currentExample.doc_id);
-  } catch (err) {
-    if (gtStatusNoteEl) gtStatusNoteEl.textContent = String(err?.message || err || "Failed to save correction.");
-  } finally {
-    setGtSaving(false);
-  }
-});
 evalRunSelectEl?.addEventListener("change", () => {
   const name = String(evalRunSelectEl.value || "");
   updateRunInUrl(name);

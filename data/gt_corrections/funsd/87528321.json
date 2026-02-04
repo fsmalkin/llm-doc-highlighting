@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "87528321",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "87528321.png"
+  },
+  "items": [
+    {
+      "field_label": "ORIGINATOR Name:",
+      "gt_status": "use_dataset",
+      "item_id": "87528321_q65",
+      "links": {
+        "eval_example_id": "87528321_q65",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=87528321&ex=87528321_q65"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T23:30:18.209Z"
+      }
+    }
+  ]
+}

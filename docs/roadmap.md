@@ -12,6 +12,7 @@ Milestones
 - Run a tiny pilot (1 to 3 docs) in Eval Review using GT decisions
 - Store first correction JSONs in `data/gt_corrections/funsd/`
 - Document FUNSD GT issues and where corrections are cataloged
+- Track eval findings and observations, and address the top issues (see `docs/eval-findings.md`)
 - Curate a small FUNSD demo subset for open-ended QA + grounding
 
 Notes
@@ -30,6 +31,7 @@ Outputs
 - A/B comparison: indexed (token-based) vs raw+fuzzy (raw + raw_extra, with pass2 fallback)
 - Metrics: span validity, mapping success, overlap accuracy, latency, token cost
 - Per-dataset report with failure modes and data quality notes
+- Public eval narrative + static overlay gallery (no viewer required)
 - Eval Review UI for visual inspection
 
 ## Parking lot / future

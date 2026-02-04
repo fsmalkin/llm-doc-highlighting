@@ -1,0 +1,40 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "83624198",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "83624198.png"
+  },
+  "items": [
+    {
+      "field_label": "Fax",
+      "gt_status": "use_dataset",
+      "item_id": "83624198_q13",
+      "links": {
+        "eval_example_id": "83624198_q13",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=83624198&ex=83624198_q13"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T13:16:21.589Z"
+      }
+    },
+    {
+      "field_label": "FAX NUMBER:",
+      "gt_status": "use_dataset",
+      "item_id": "83624198_q25",
+      "links": {
+        "eval_example_id": "83624198_q25",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=83624198&ex=83624198_q25"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T13:16:33.852Z"
+      }
+    }
+  ]
+}

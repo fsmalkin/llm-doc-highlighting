@@ -1,0 +1,51 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "87332450",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "87332450.png"
+  },
+  "items": [
+    {
+      "field_label": "Advance Registration Fee:",
+      "gt_status": "use_correction",
+      "value": "$ 135.00",
+      "bbox": [
+        427.0,
+        487.5,
+        473.0,
+        499.0
+      ],
+      "word_boxes": [
+        [
+          427.0,
+          488.5,
+          434.5,
+          499.0
+        ],
+        [
+          434.0,
+          487.5,
+          473.0,
+          499.0
+        ]
+      ],
+      "value_type": "Currency / Amount",
+      "notes": "GT missing \".\"",
+      "item_id": "87332450_q31",
+      "links": {
+        "eval_example_id": "87332450_q31",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=87332450&ex=87332450_q31",
+        "method": "raw"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "method": "raw",
+        "saved_at": "2026-02-02T23:26:08.710Z"
+      }
+    }
+  ]
+}

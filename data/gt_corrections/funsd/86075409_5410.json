@@ -14,12 +14,27 @@
       "item_id": "86075409_5410_q1",
       "links": {
         "eval_example_id": "86075409_5410_q1",
-        "eval_run": "run_20260201_013602.json",
-        "eval_url_params": "run=run_20260201_013602.json&doc=86075409_5410&ex=86075409_5410_q1"
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=86075409_5410&ex=86075409_5410_q1"
       },
       "source": {
         "tool": "eval-viewer",
-        "saved_at": "2026-02-01T18:02:17.179Z"
+        "saved_at": "2026-02-02T13:14:17.970Z"
+      }
+    },
+    {
+      "field_label": "Don Kisling",
+      "gt_status": "exclude",
+      "notes": "Don Kisling is not a field, it's one value for the field CC",
+      "item_id": "86075409_5410_q27",
+      "links": {
+        "eval_example_id": "86075409_5410_q27",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=86075409_5410&ex=86075409_5410_q27"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T13:15:10.773Z"
       }
     }
   ]

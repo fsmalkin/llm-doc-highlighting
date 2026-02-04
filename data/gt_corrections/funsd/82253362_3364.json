@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "82253362_3364",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "82253362_3364.png"
+  },
+  "items": [
+    {
+      "field_label": "SEP 22",
+      "gt_status": "exclude",
+      "notes": "SEP 22 is a value not a field",
+      "item_id": "82253362_3364_q49",
+      "links": {
+        "eval_example_id": "82253362_3364_q49",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=82253362_3364&ex=82253362_3364_q49"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T23:30:03.841Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "82562350",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "82562350.png"
+  },
+  "items": [
+    {
+      "field_label": "Fax:",
+      "gt_status": "use_dataset",
+      "item_id": "82562350_q10",
+      "links": {
+        "eval_example_id": "82562350_q10",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=82562350&ex=82562350_q10"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T23:27:56.543Z"
+      }
+    }
+  ]
+}

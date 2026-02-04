@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "86220490",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "86220490.png"
+  },
+  "items": [
+    {
+      "field_label": "FAX",
+      "gt_status": "exclude",
+      "notes": "Multiple fields in this document",
+      "item_id": "86220490_q2",
+      "links": {
+        "eval_example_id": "86220490_q2",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=86220490&ex=86220490_q2"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T23:29:32.108Z"
+      }
+    }
+  ]
+}

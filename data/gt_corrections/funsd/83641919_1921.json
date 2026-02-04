@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "83641919_1921",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "83641919_1921.png"
+  },
+  "items": [
+    {
+      "field_label": "Name of Account",
+      "gt_status": "exclude",
+      "notes": "This is a table and should be analyzed differently",
+      "item_id": "83641919_1921_q89",
+      "links": {
+        "eval_example_id": "83641919_1921_q89",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=83641919_1921&ex=83641919_1921_q89"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T13:22:50.673Z"
+      }
+    }
+  ]
+}

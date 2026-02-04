@@ -1,0 +1,45 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "91814768_91814769",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "91814768_91814769.png"
+  },
+  "items": [
+    {
+      "field_label": "4. Question No.",
+      "gt_status": "use_correction",
+      "value": "1",
+      "bbox": [
+        178.5,
+        371.5,
+        185.5,
+        381.5
+      ],
+      "word_boxes": [
+        [
+          178.5,
+          371.5,
+          185.5,
+          381.5
+        ]
+      ],
+      "value_type": "Number",
+      "notes": "\"Question No\" is a separate field from \"relating to\"",
+      "item_id": "91814768_91814769_q35",
+      "links": {
+        "eval_example_id": "91814768_91814769_q35",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=91814768_91814769&ex=91814768_91814769_q35",
+        "method": "raw"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "method": "raw",
+        "saved_at": "2026-02-02T13:21:52.107Z"
+      }
+    }
+  ]
+}

@@ -4,9 +4,21 @@ This repo captures a document highlighting pipeline that converts unstructured d
 - cached, reproducible preprocessing artifacts, and
 - geometry-grounded highlight outputs suitable for downstream rendering.
 
-The design is intentionally preprocessing-first: expensive or fragile steps (parsing, OCR, geometry extraction) happen once per document/config and are cached. Downstream logic operates on stable artifacts rather than re-parsing the source file.
+The design is intentionally preprocessing-first: expensive or fragile steps (parsing, OCR, geometry extraction)
+happen once per document/config and are cached. Downstream logic operates on stable artifacts rather than
+re-parsing the source file.
 
-> **Prominent next step:** run iterative evaluations (small samples first) to validate end-to-end data collection and reporting before scaling. See `docs/next-steps.md`.
+## High-level flow
+
+```mermaid
+flowchart LR
+  A[PDF document] -->|preprocess_document.py| B[Cache / artifacts]
+  B --> C[geometry_index.json]
+  C -->|reading_view.py| D[Reading view with token indices]
+  D -->|LLM resolver| E[Span citation]
+  E -->|map span to word_ids| F[Word boxes]
+  F --> G[Viewer / Eval UI]
+```
 
 ## Core outcomes
 
@@ -27,8 +39,38 @@ The design is intentionally preprocessing-first: expensive or fragile steps (par
 6. Raw + fuzzy resolver (two-pass)
    - First pass asks for raw span + raw extra context.
    - If mapping is ambiguous, a second pass uses a cheaper indexed resolver to return token indices.
-6. Deterministic fallback
+7. Deterministic fallback
    - When the LLM is unavailable or span validation fails, a simple deterministic matcher can still resolve some citations.
+
+## Evaluation loop (overview)
+
+```mermaid
+flowchart LR
+  A[FUNSD dataset] -->|funsd_eval.py| B[run_*.json report]
+  B --> C[Eval Review UI]
+  B --> D[Stats view]
+  B -->|render_funsd_overlays.py| E[Overlay gallery]
+  C --> F[GT corrections JSON]
+  F -->|re-run| B
+```
+
+## Major components and code
+
+Core pipeline
+- Phase 1 preprocessing: `scripts/preprocess_document.py`
+- Fine geometry extraction: `scripts/fine_geometry.py`
+- Geometry index builder: `scripts/build_geometry_index.py`
+- Reading view assembly: `scripts/reading_view.py`
+
+Resolvers
+- Indexed resolver: `scripts/llm_resolve_span.py`
+- Raw + fuzzy two-pass resolver: `scripts/two_pass_resolve_span.py`
+- Deterministic fallback: `scripts/resolve_highlight.py`
+
+Demo + eval
+- Local demo server: `scripts/demo_server.py`
+- FUNSD evaluator: `scripts/funsd_eval.py`
+- Overlay renderer: `scripts/render_funsd_overlays.py`
 
 ## Repository organization
 

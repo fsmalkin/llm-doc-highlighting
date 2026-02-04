@@ -1,0 +1,27 @@
+{
+  "schema_version": 2,
+  "dataset": "funsd",
+  "doc_id": "82250337_0338",
+  "doc_page": 1,
+  "doc_source": {
+    "type": "image",
+    "path": "82250337_0338.png"
+  },
+  "items": [
+    {
+      "field_label": "PRICE POINT:",
+      "gt_status": "exclude",
+      "notes": "The gold value is two options for a single-select field",
+      "item_id": "82250337_0338_q22",
+      "links": {
+        "eval_example_id": "82250337_0338_q22",
+        "eval_run": "run_20260202_080052.json",
+        "eval_url_params": "run=run_20260202_080052.json&doc=82250337_0338&ex=82250337_0338_q22"
+      },
+      "source": {
+        "tool": "eval-viewer",
+        "saved_at": "2026-02-02T23:25:21.796Z"
+      }
+    }
+  ]
+}

@@ -352,6 +352,22 @@ def _box_iou(a: List[float], b: List[float]) -> float:
     return inter / union
 
 
+def _box_ioa(a: List[float], b: List[float]) -> float:
+    ax0, ay0, ax1, ay1 = [float(v) for v in a]
+    bx0, by0, bx1, by1 = [float(v) for v in b]
+    inter_x0 = max(ax0, bx0)
+    inter_y0 = max(ay0, by0)
+    inter_x1 = min(ax1, bx1)
+    inter_y1 = min(ay1, by1)
+    inter_w = max(0.0, inter_x1 - inter_x0)
+    inter_h = max(0.0, inter_y1 - inter_y0)
+    inter = inter_w * inter_h
+    area_b = max(0.0, bx1 - bx0) * max(0.0, by1 - by0)
+    if area_b <= 0.0:
+        return 0.0
+    return inter / area_b
+
+
 def _dedupe_boxes(boxes: List[List[float]], *, decimals: int = 2) -> List[List[float]]:
     seen: set[Tuple[float, float, float, float]] = set()
     out: List[List[float]] = []
@@ -370,12 +386,57 @@ def _dedupe_boxes(boxes: List[List[float]], *, decimals: int = 2) -> List[List[f
     return out
 
 
-def _match_boxes(pred_boxes: List[List[float]], gt_boxes: List[List[float]], iou_thresh: float) -> Dict[str, Any]:
+def _matches_threshold(
+    pred_box: List[float],
+    gt_box: List[float],
+    iou_thresh: float,
+    ioa_thresh: float | None,
+) -> bool:
+    if _box_iou(pred_box, gt_box) >= iou_thresh:
+        return True
+    if ioa_thresh is None:
+        return False
+    return _box_ioa(pred_box, gt_box) >= ioa_thresh
+
+
+def _match_boxes(
+    pred_boxes: List[List[float]],
+    gt_boxes: List[List[float]],
+    iou_thresh: float,
+    ioa_thresh: float | None = None,
+    *,
+    allow_multi: bool = False,
+) -> Dict[str, Any]:
+    pred_count = len(pred_boxes)
+    gt_count = len(gt_boxes)
+    if allow_multi:
+        pred_matched = 0
+        for p in pred_boxes:
+            if any(_matches_threshold(p, g, iou_thresh, ioa_thresh) for g in gt_boxes):
+                pred_matched += 1
+        gt_matched = 0
+        for g in gt_boxes:
+            if any(_matches_threshold(p, g, iou_thresh, ioa_thresh) for p in pred_boxes):
+                gt_matched += 1
+        denom = pred_count + gt_count
+        return {
+            "matched": gt_matched,
+            "pred_matched": pred_matched,
+            "gt_matched": gt_matched,
+            "pred_count": pred_count,
+            "gt_count": gt_count,
+            "precision": pred_matched / pred_count if pred_count else 0.0,
+            "recall": gt_matched / gt_count if gt_count else 0.0,
+            "word_iou": (pred_matched + gt_matched) / denom if denom else 0.0,
+        }
+
     matched_gt: set[int] = set()
     matched = 0
     for p in pred_boxes:
         best_iou = 0.0
         best_idx = None
+        best_ioa = 0.0
+        best_ioa_idx = None
         for gi, g in enumerate(gt_boxes):
             if gi in matched_gt:
                 continue
@@ -383,14 +444,24 @@ def _match_boxes(pred_boxes: List[List[float]], gt_boxes: List[List[float]], iou
             if iou > best_iou:
                 best_iou = iou
                 best_idx = gi
+            if ioa_thresh is not None:
+                ioa = _box_ioa(p, g)
+                if ioa > best_ioa:
+                    best_ioa = ioa
+                    best_ioa_idx = gi
+        match_idx = None
         if best_idx is not None and best_iou >= iou_thresh:
+            match_idx = best_idx
+        elif ioa_thresh is not None and best_ioa_idx is not None and best_ioa >= ioa_thresh:
+            match_idx = best_ioa_idx
+        if match_idx is not None:
             matched += 1
-            matched_gt.add(best_idx)
-    pred_count = len(pred_boxes)
-    gt_count = len(gt_boxes)
+            matched_gt.add(match_idx)
     union = pred_count + gt_count - matched
     return {
         "matched": matched,
+        "pred_matched": matched,
+        "gt_matched": matched,
         "pred_count": pred_count,
         "gt_count": gt_count,
         "precision": matched / pred_count if pred_count else 0.0,
@@ -466,9 +537,14 @@ def _run_resolver(
     latency = time.time() - t0
     if proc.returncode != 0:
         msg = proc.stderr.strip() or proc.stdout.strip() or "resolver failed"
-        return {"ok": False, "error": msg, "latency_sec": latency}
+        return {
+            "ok": False,
+            "error": msg,
+            "error_kind": "connectivity" if _is_connectivity_error(msg) else "other",
+            "latency_sec": latency,
+        }
     if not out_path.exists():
-        return {"ok": False, "error": "missing output json", "latency_sec": latency}
+        return {"ok": False, "error": "missing output json", "error_kind": "other", "latency_sec": latency}
     data = json.loads(out_path.read_text(encoding="utf-8"))
     data["latency_sec"] = latency
     data["ok"] = True
@@ -490,9 +566,34 @@ def _summarize_method(results: List[Dict[str, Any]]) -> Dict[str, Any]:
         "avg_word_iou": _avg("word_iou"),
         "avg_precision": _avg("precision"),
         "avg_recall": _avg("recall"),
+        "avg_word_iou_strict": _avg("word_iou_strict"),
+        "avg_precision_strict": _avg("precision_strict"),
+        "avg_recall_strict": _avg("recall_strict"),
         "pass2_rate": _avg("used_pass2"),
         "avg_latency_sec": _avg("latency_sec"),
     }
+
+
+def _is_connectivity_error(message: str) -> bool:
+    if not message:
+        return False
+    msg = message.lower()
+    hints = (
+        "getaddrinfo failed",
+        "name resolution",
+        "failed to resolve",
+        "connectionerror",
+        "connecttimeout",
+        "readtimeout",
+        "max retries exceeded",
+        "temporary failure in name resolution",
+        "connection refused",
+        "connection reset",
+        "timed out",
+        "remote disconnected",
+        "socket.gaierror",
+    )
+    return any(hint in msg for hint in hints)
 
 
 def main() -> None:
@@ -501,6 +602,7 @@ def main() -> None:
     ap.add_argument("--split", default="test", help="train|test|all (default: test)")
     ap.add_argument("--limit", type=int, default=10, help="Sample size (default: 10)")
     ap.add_argument("--seed", type=int, default=13, help="Sample seed (default: 13)")
+    ap.add_argument("--sample-from", default=None, help="Reuse example ids from an existing run JSON")
     ap.add_argument("--method", choices=["indexed", "raw"], default="raw", help="Resolver method")
     ap.add_argument("--compare", action="store_true", help="Run both methods on the same sample")
     ap.add_argument("--prompt-mode", choices=["question", "field_label"], default="field_label", help="Prompt framing")
@@ -508,7 +610,15 @@ def main() -> None:
     ap.add_argument("--model", default="gpt-5-mini", help="Model for indexed resolver (default: gpt-5-mini)")
     ap.add_argument("--model-pass1", default=None, help="Model for raw pass1 (default: OPENAI_MODEL_PASS1 or OPENAI_MODEL)")
     ap.add_argument("--model-pass2", default=None, help="Model for raw pass2 (default: OPENAI_MODEL_PASS2)")
-    ap.add_argument("--iou-thresh", type=float, default=0.5, help="IoU threshold for word matches (default: 0.5)")
+    ap.add_argument("--iou-thresh", type=float, default=0.5, help="Strict IoU threshold (default: 0.5)")
+    ap.add_argument("--lenient-iou", type=float, default=0.2, help="Lenient IoU threshold (default: 0.2)")
+    ap.add_argument("--lenient-ioa", type=float, default=0.7, help="Lenient IoA threshold (default: 0.7)")
+    ap.add_argument(
+        "--connectivity-fail-max",
+        type=int,
+        default=3,
+        help="Abort the run after this many connectivity failures (default: 3, set 0 to ignore)",
+    )
     ap.add_argument("--trace", action="store_true", help="Include LLM request/response in output JSON")
     ap.add_argument("--out", default=None, help="Output JSON path (default: reports/funsd/run_<ts>.json)")
     args = ap.parse_args()
@@ -521,9 +631,29 @@ def main() -> None:
     if not examples:
         raise RuntimeError("No FUNSD examples found. Check dataset path.")
 
-    rng = random.Random(args.seed)
-    if args.limit and len(examples) > args.limit:
-        examples = rng.sample(examples, args.limit)
+    sample_from_ids: Dict[str, int] = {}
+    if args.sample_from:
+        run_path = pathlib.Path(args.sample_from)
+        if not run_path.exists():
+            raise FileNotFoundError(f"sample-from run not found: {run_path}")
+        run_payload = _load_json(run_path)
+        run_examples = run_payload.get("examples") or []
+        for idx, item in enumerate(run_examples):
+            ex_id = item.get("id")
+            if ex_id:
+                sample_from_ids[str(ex_id)] = idx
+    if sample_from_ids:
+        examples = [
+            ex for ex in examples
+            if f"{ex['doc_id']}_q{ex['question_id']}" in sample_from_ids
+        ]
+        examples.sort(
+            key=lambda ex: sample_from_ids.get(f"{ex['doc_id']}_q{ex['question_id']}", 10**9)
+        )
+    else:
+        rng = random.Random(args.seed)
+        if args.limit and len(examples) > args.limit:
+            examples = rng.sample(examples, args.limit)
 
     run_id = time.strftime("%Y%m%d_%H%M%S")
     reports_dir = REPO_ROOT / "reports" / "funsd"
@@ -539,6 +669,7 @@ def main() -> None:
     corrections_cache: Dict[str, Dict[str, Any]] = {}
     excluded_count = 0
     corrected_count = 0
+    connectivity_failures = 0
 
     for ex in examples:
         img_path = pathlib.Path(ex["image_path"])
@@ -622,6 +753,17 @@ def main() -> None:
                 model_pass2=args.model_pass2,
                 trace=bool(args.trace),
             )
+            if (
+                not result.get("ok")
+                and result.get("error_kind") == "connectivity"
+                and args.connectivity_fail_max > 0
+            ):
+                connectivity_failures += 1
+                if connectivity_failures >= args.connectivity_fail_max:
+                    raise RuntimeError(
+                        f"Aborting run after {connectivity_failures} connectivity failures. "
+                        f"Last error: {result.get('error')}"
+                    )
             pred_boxes: List[List[float]] = []
             mapping_success = 0.0
             span_valid = 0.0
@@ -633,8 +775,26 @@ def main() -> None:
                 span_valid = 1.0 if result.get("citation", {}).get("start_token") is not None else 0.0
                 used_pass2 = 1.0 if result.get("meta", {}).get("used_pass2") else 0.0
 
-            match = _match_boxes(pred_boxes, gt_boxes, float(args.iou_thresh)) if pred_boxes and gt_boxes else {
+            strict_match = _match_boxes(pred_boxes, gt_boxes, float(args.iou_thresh)) if pred_boxes and gt_boxes else {
                 "matched": 0,
+                "pred_matched": 0,
+                "gt_matched": 0,
+                "pred_count": len(pred_boxes),
+                "gt_count": len(gt_boxes),
+                "precision": 0.0,
+                "recall": 0.0,
+                "word_iou": 0.0,
+            }
+            lenient_match = _match_boxes(
+                pred_boxes,
+                gt_boxes,
+                float(args.lenient_iou),
+                float(args.lenient_ioa),
+                allow_multi=True,
+            ) if pred_boxes and gt_boxes else {
+                "matched": 0,
+                "pred_matched": 0,
+                "gt_matched": 0,
                 "pred_count": len(pred_boxes),
                 "gt_count": len(gt_boxes),
                 "precision": 0.0,
@@ -650,6 +810,14 @@ def main() -> None:
                     "precision": None,
                     "recall": None,
                     "matched": None,
+                    "pred_matched": None,
+                    "gt_matched": None,
+                    "word_iou_strict": None,
+                    "precision_strict": None,
+                    "recall_strict": None,
+                    "matched_strict": None,
+                    "pred_matched_strict": None,
+                    "gt_matched_strict": None,
                     "pred_count": len(pred_boxes),
                     "gt_count": len(gt_boxes),
                     "used_pass2": None,
@@ -660,12 +828,20 @@ def main() -> None:
                     "excluded": False,
                     "span_valid": span_valid,
                     "mapping_success": mapping_success,
-                    "word_iou": match["word_iou"],
-                    "precision": match["precision"],
-                    "recall": match["recall"],
-                    "matched": match["matched"],
-                    "pred_count": match["pred_count"],
-                    "gt_count": match["gt_count"],
+                    "word_iou": lenient_match["word_iou"],
+                    "precision": lenient_match["precision"],
+                    "recall": lenient_match["recall"],
+                    "matched": lenient_match["matched"],
+                    "pred_matched": lenient_match.get("pred_matched", lenient_match["matched"]),
+                    "gt_matched": lenient_match.get("gt_matched", lenient_match["matched"]),
+                    "pred_count": lenient_match["pred_count"],
+                    "gt_count": lenient_match["gt_count"],
+                    "word_iou_strict": strict_match["word_iou"],
+                    "precision_strict": strict_match["precision"],
+                    "recall_strict": strict_match["recall"],
+                    "matched_strict": strict_match["matched"],
+                    "pred_matched_strict": strict_match.get("pred_matched", strict_match["matched"]),
+                    "gt_matched_strict": strict_match.get("gt_matched", strict_match["matched"]),
                     "used_pass2": used_pass2,
                     "latency_sec": result.get("latency_sec", 0.0),
                 }
@@ -706,7 +882,7 @@ def main() -> None:
 
     out = {
         "meta": {
-            "eval_schema_version": 3,
+            "eval_schema_version": 4,
             "dataset": "FUNSD",
             "split": args.split,
             "sample_size": len(run_examples),
@@ -719,6 +895,15 @@ def main() -> None:
             "model_pass1": args.model_pass1,
             "model_pass2": args.model_pass2,
             "iou_threshold": args.iou_thresh,
+            "lenient_iou_threshold": args.lenient_iou,
+            "lenient_ioa_threshold": args.lenient_ioa,
+            "lenient_match_mode": "coverage_any",
+            "lenient_match_note": (
+                "Lenient metrics count a GT word as matched if any predicted box overlaps with "
+                "IoU >= lenient_iou or IoA >= lenient_ioa. The overlap score is computed as "
+                "(pred_matched + gt_matched) / (pred_count + gt_count)."
+            ),
+            "connectivity_fail_max": args.connectivity_fail_max,
             "rails_required": _bool_env("RAILS_REQUIRED", "1"),
             "vision_primary": os.getenv("VISION_RAILS_PRIMARY", "1") != "0",
             "gt_corrections": {

@@ -2,7 +2,20 @@
 
 This repository is a documentation-first snapshot of a document processing pipeline that produces geometry-grounded highlights.
 
-Roadmap: see `docs/roadmap.md` for forward-looking plans and active milestones.
+Start here:
+- High-level overview: `docs/overview.md`
+- Pipeline details: `docs/pipeline.md`
+- Data model: `docs/data-model.md`
+
+Evaluation:
+- FUNSD eval narrative: `docs/eval/funsd-eval.md`
+- Overlay gallery: `docs/eval/funsd-overlays/README.md`
+- Experiment log: `docs/eval-experiments.md`
+- Findings/observations: `docs/eval-findings.md`
+
+Planning:
+- Roadmap: `docs/roadmap.md`
+- Plan of record: `docs/plan.md`
 Core ideas implemented here:
 - Preprocessing-first artifacts: parse/chunk once, cache, and reuse.
 - LLM-indexed reading view: build a full-document reading view with stable global token indices tied to geometry (`word_id`).
@@ -90,6 +103,13 @@ Example question:
 FUNSD has known GT issues (label/value mismatches, missing boxes, incorrect values).
 We treat FUNSD as a small demo dataset for open-ended QA + grounding and catalog corrections under:
 `data/gt_corrections/funsd/` (see `docs/gt-corrections.md`).
+We document FUNSD GT issues and our corrections workflow in:
+- `docs/eval-findings.md`
+- `docs/gt-corrections.md`
+
+Public eval narrative and overlays:
+- `docs/eval/funsd-eval.md`
+- `docs/eval/funsd-overlays/README.md`
 
 The FUNSD dataset is not included in git. Use the helper to download and extract it:
 ```bash
@@ -108,7 +128,8 @@ Outputs:
 Notes:
 - The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
 - FUNSD prompts treat the field label as the key and ask for the corresponding value span.
-- Because GT has issues, treat FUNSD metrics as directional only. Use the corrections catalog when reviewing errors.
+- Because GT has issues, treat FUNSD metrics as directional only. Track runs in `docs/eval-experiments.md`
+  and log findings in `docs/eval-findings.md`. Use the corrections catalog when reviewing errors.
 - The demo app includes a Stats page at `/stats.html` and an Eval Review page at `/eval.html` (GT corrections happen inside Eval Review).
 
 ## Docs
@@ -119,5 +140,13 @@ Notes:
 - `docs/runbook.md` - end-to-end runs and expected artifacts
 - `docs/gt-corrections.md` - GT correction workflow (in-repo Eval Review)
 - `docs/gt-corrections-schema.md` - correction JSON schema
+- `docs/eval-experiments.md` - experiment results log (runs + configs)
+- `docs/eval-findings.md` - findings and observations from eval review
 - `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach
+
+## Repository map
+
+- `scripts/` - pipeline code and eval utilities
+- `demo-app/` - local interactive demo and eval UI
+- `docs/` - narrative + reference documentation (see `docs/README.md`)
