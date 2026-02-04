@@ -1,26 +1,35 @@
 # llm-doc-highlighting
 
-This repository is a documentation-first snapshot of a document processing pipeline that produces geometry-grounded highlights.
+This repository documents a pipeline that answers questions over documents and highlights the exact
+source text on the page. It is designed to be reproducible and auditable: every highlight is derived
+from cached artifacts and a verifiable span citation.
 
-Start here:
-- High-level overview: `docs/overview.md`
-- Pipeline details: `docs/pipeline.md`
-- Data model: `docs/data-model.md`
+If you are new here, use this path:
+- What this is: [docs/overview.md](docs/overview.md)
+- How it works end to end: [docs/pipeline.md](docs/pipeline.md)
+- Data contracts: [docs/data-model.md](docs/data-model.md)
 
-Evaluation:
-- FUNSD eval narrative: `docs/eval/funsd-eval.md`
-- Overlay gallery: `docs/eval/funsd-overlays/README.md`
-- Experiment log: `docs/eval-experiments.md`
-- Findings/observations: `docs/eval-findings.md`
+See example outputs:
+- FUNSD eval narrative: [docs/eval/funsd-eval.md](docs/eval/funsd-eval.md)
+- Overlay gallery (GT vs methods): [docs/eval/funsd-overlays/README.md](docs/eval/funsd-overlays/README.md)
+- Experiments log: [docs/eval-experiments.md](docs/eval-experiments.md)
+- Findings/observations: [docs/eval-findings.md](docs/eval-findings.md)
 
 Planning:
-- Roadmap: `docs/roadmap.md`
-- Plan of record: `docs/plan.md`
+- Roadmap: [docs/roadmap.md](docs/roadmap.md)
+- Plan of record: [docs/plan.md](docs/plan.md)
 Core ideas implemented here:
 - Preprocessing-first artifacts: parse/chunk once, cache, and reuse.
 - LLM-indexed reading view: build a full-document reading view with stable global token indices tied to geometry (`word_id`).
 - Span-based citations: the model cites using `start_token`/`end_token` over that reading view, and we deterministically map spans -> `word_ids` -> geometry.
 - Deterministic fallback: when LLM is unavailable or returns invalid spans, fall back to simple deterministic matching.
+
+How to understand the code (short version):
+1) **Phase 1** builds cached artifacts (`cache/<doc_hash>/`).
+2) **Phase 2** resolves a question to a span, then to word boxes.
+3) The **viewer** renders those word boxes as highlights.
+
+If you want a concrete example, start with the FUNSD overlays and eval narrative above.
 
 
 ## Quickstart (local)
@@ -102,14 +111,14 @@ Example question:
 
 FUNSD has known GT issues (label/value mismatches, missing boxes, incorrect values).
 We treat FUNSD as a small demo dataset for open-ended QA + grounding and catalog corrections under:
-`data/gt_corrections/funsd/` (see `docs/gt-corrections.md`).
+`data/gt_corrections/funsd/` (see [docs/gt-corrections.md](docs/gt-corrections.md)).
 We document FUNSD GT issues and our corrections workflow in:
-- `docs/eval-findings.md`
-- `docs/gt-corrections.md`
+- [docs/eval-findings.md](docs/eval-findings.md)
+- [docs/gt-corrections.md](docs/gt-corrections.md)
 
 Public eval narrative and overlays:
-- `docs/eval/funsd-eval.md`
-- `docs/eval/funsd-overlays/README.md`
+- [docs/eval/funsd-eval.md](docs/eval/funsd-eval.md)
+- [docs/eval/funsd-overlays/README.md](docs/eval/funsd-overlays/README.md)
 
 The FUNSD dataset is not included in git. Use the helper to download and extract it:
 ```bash
@@ -128,25 +137,26 @@ Outputs:
 Notes:
 - The eval harness converts FUNSD images to single-page PDFs under `data/funsd/pdf/`.
 - FUNSD prompts treat the field label as the key and ask for the corresponding value span.
-- Because GT has issues, treat FUNSD metrics as directional only. Track runs in `docs/eval-experiments.md`
-  and log findings in `docs/eval-findings.md`. Use the corrections catalog when reviewing errors.
+- Because GT has issues, treat FUNSD metrics as directional only. Track runs in
+  [docs/eval-experiments.md](docs/eval-experiments.md) and log findings in
+  [docs/eval-findings.md](docs/eval-findings.md). Use the corrections catalog when reviewing errors.
 - The demo app includes a Stats page at `/stats.html` and an Eval Review page at `/eval.html` (GT corrections happen inside Eval Review).
 
 ## Docs
 
-- `docs/overview.md` - what exists and how it fits together
-- `docs/pipeline.md` - Phase 1 and Phase 2, inputs/outputs, artifacts
-- `docs/data-model.md` - canonical JSON schema and invariants
-- `docs/runbook.md` - end-to-end runs and expected artifacts
-- `docs/gt-corrections.md` - GT correction workflow (in-repo Eval Review)
-- `docs/gt-corrections-schema.md` - correction JSON schema
-- `docs/eval-experiments.md` - experiment results log (runs + configs)
-- `docs/eval-findings.md` - findings and observations from eval review
-- `docs/next-steps.md` - ideas and experiments to reduce token cost / improve robustness
+- [docs/overview.md](docs/overview.md) - what exists and how it fits together
+- [docs/pipeline.md](docs/pipeline.md) - Phase 1 and Phase 2, inputs/outputs, artifacts
+- [docs/data-model.md](docs/data-model.md) - canonical JSON schema and invariants
+- [docs/runbook.md](docs/runbook.md) - end-to-end runs and expected artifacts
+- [docs/gt-corrections.md](docs/gt-corrections.md) - GT correction workflow (in-repo Eval Review)
+- [docs/gt-corrections-schema.md](docs/gt-corrections-schema.md) - correction JSON schema
+- [docs/eval-experiments.md](docs/eval-experiments.md) - experiment results log (runs + configs)
+- [docs/eval-findings.md](docs/eval-findings.md) - findings and observations from eval review
+- [docs/next-steps.md](docs/next-steps.md) - ideas and experiments to reduce token cost / improve robustness
 - `docs/algorithms/` - deeper dives into the alignment and indexing approach
 
 ## Repository map
 
 - `scripts/` - pipeline code and eval utilities
 - `demo-app/` - local interactive demo and eval UI
-- `docs/` - narrative + reference documentation (see `docs/README.md`)
+- `docs/` - narrative + reference documentation (see [docs/README.md](docs/README.md))
