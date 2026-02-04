@@ -24,6 +24,10 @@ Core ideas implemented here:
 - Span-based citations: the model cites using `start_token`/`end_token` over that reading view, and we deterministically map spans -> `word_ids` -> geometry.
 - Deterministic fallback: when LLM is unavailable or returns invalid spans, fall back to simple deterministic matching.
 
+Typed outputs (optional):
+- The LLM can return typed values (Date, Phone, Currency, etc.) while highlights still map to the raw
+  text span. Typed formatting never changes what gets highlighted.
+
 How to understand the code (short version):
 1) **Phase 1** builds cached artifacts (`cache/<doc_hash>/`).
 2) **Phase 2** resolves a question to a span, then to word boxes.

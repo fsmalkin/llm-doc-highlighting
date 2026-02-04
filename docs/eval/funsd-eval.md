@@ -62,7 +62,7 @@ Strict overlap (IoU>=0.5):
 
 Browse the overlay gallery for this run:
 
-- `docs/eval/funsd-overlays/README.md`
+- [docs/eval/funsd-overlays/README.md](funsd-overlays/README.md)
 
 Legend: GT (green), Raw + Fuzzy (red), Indexed (blue).
 

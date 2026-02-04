@@ -83,6 +83,39 @@ def _draw_boxes(draw: ImageDraw.ImageDraw, boxes: List[List[float]], color: Tupl
         draw.rectangle([x0, y0, x1, y1], outline=color, width=width)
 
 
+def _merge_boxes_by_line(boxes: List[List[float]]) -> List[List[float]]:
+    if not boxes:
+        return []
+    heights = [abs(b[3] - b[1]) for b in boxes if isinstance(b, list) and len(b) == 4]
+    if not heights:
+        return boxes
+    heights_sorted = sorted(heights)
+    median_h = heights_sorted[len(heights_sorted) // 2]
+    y_thresh = max(6.0, 0.6 * median_h)
+
+    rows: List[Dict[str, Any]] = []
+    for box in sorted(boxes, key=lambda b: (b[1], b[0])):
+        cy = (box[1] + box[3]) / 2.0
+        placed = False
+        for row in rows:
+            if abs(cy - row["cy"]) <= y_thresh:
+                row["boxes"].append(box)
+                row["cy"] = sum((b[1] + b[3]) / 2.0 for b in row["boxes"]) / len(row["boxes"])
+                placed = True
+                break
+        if not placed:
+            rows.append({"cy": cy, "boxes": [box]})
+
+    merged: List[List[float]] = []
+    for row in rows:
+        xs0 = [b[0] for b in row["boxes"]]
+        ys0 = [b[1] for b in row["boxes"]]
+        xs1 = [b[2] for b in row["boxes"]]
+        ys1 = [b[3] for b in row["boxes"]]
+        merged.append([min(xs0), min(ys0), max(xs1), max(ys1)])
+    return merged
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Render FUNSD overlay images from a run JSON.")
     ap.add_argument("--run", required=True, help="Run JSON path (reports/funsd/run_*.json)")
@@ -108,6 +141,7 @@ def main() -> None:
         "indexed": (76, 111, 255),
     }
     width = 3
+    draw_indexed = False
 
     for ex in examples:
         img_path = pathlib.Path(ex.get("image_path") or "")
@@ -121,13 +155,17 @@ def main() -> None:
         raw_mapped = (ex.get("methods", {}).get("raw", {}) or {}).get("mapped") or {}
         raw_boxes = _boxes_from_pred(raw_mapped.get("pages") or [])
         raw_boxes = [_clamp_box(b, w, h) for b in raw_boxes]
-        idx_mapped = (ex.get("methods", {}).get("indexed", {}) or {}).get("mapped") or {}
-        idx_boxes = _boxes_from_pred(idx_mapped.get("pages") or [])
-        idx_boxes = [_clamp_box(b, w, h) for b in idx_boxes]
+        merged_raw = _merge_boxes_by_line(raw_boxes)
+        idx_boxes: List[List[float]] = []
+        if draw_indexed:
+            idx_mapped = (ex.get("methods", {}).get("indexed", {}) or {}).get("mapped") or {}
+            idx_boxes = _boxes_from_pred(idx_mapped.get("pages") or [])
+            idx_boxes = [_clamp_box(b, w, h) for b in idx_boxes]
 
         _draw_boxes(draw, gt_boxes, colors["gt"], width)
-        _draw_boxes(draw, raw_boxes, colors["raw"], width)
-        _draw_boxes(draw, idx_boxes, colors["indexed"], width)
+        _draw_boxes(draw, merged_raw, colors["raw"], width)
+        if draw_indexed:
+            _draw_boxes(draw, idx_boxes, colors["indexed"], width)
 
         out_name = f"{ex.get('id')}.png"
         image.save(out_dir / out_name, format="PNG")
@@ -189,9 +227,9 @@ def _write_gallery_markdown(out_dir: pathlib.Path, run: Dict[str, Any], examples
     lines.append("# FUNSD overlay gallery (sample run)")
     lines.append("")
     lines.append("Legend:")
-    lines.append("- GT (green outline)")
-    lines.append("- Raw + Fuzzy (red outline)")
-    lines.append("- Indexed (blue outline)")
+    lines.append("- GT (green outline, per-word boxes)")
+    lines.append("- Raw + Fuzzy (red outline, merged/rails boxes)")
+    lines.append("- Indexed is hidden in these images (values shown below).")
     lines.append("")
     lines.append("These overlays are generated from the 20-sample FUNSD evaluation run:")
     lines.append(f"`{run_path}` (non-excluded examples only).")
@@ -230,7 +268,7 @@ def _write_gallery_markdown(out_dir: pathlib.Path, run: Dict[str, Any], examples
         lines.append("| --- | --- |")
         lines.append(f"| GT | `{_fmt_value(gt_value)}` |")
         lines.append(f"| Raw + Fuzzy | `{raw_answer}` |")
-        lines.append(f"| Indexed | `{idx_answer}` |")
+        lines.append(f"| Indexed (hidden) | `{idx_answer}` |")
         lines.append("")
         lines.append("| Method | Overlap | Precision | Recall | Strict IoU |")
         lines.append("| --- | --- | --- | --- | --- |")
@@ -242,7 +280,7 @@ def _write_gallery_markdown(out_dir: pathlib.Path, run: Dict[str, Any], examples
             f"{_fmt_metric(raw_metrics.get('word_iou_strict'))} |"
         )
         lines.append(
-            "| Indexed | "
+            "| Indexed (hidden) | "
             f"{_fmt_metric(idx_metrics.get('word_iou'))} | "
             f"{_fmt_metric(idx_metrics.get('precision'))} | "
             f"{_fmt_metric(idx_metrics.get('recall'))} | "
